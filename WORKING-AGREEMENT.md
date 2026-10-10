@@ -1,9 +1,9 @@
 # Team working agreement
 
-- Team and repository (`mlops-<session>-<team-name>-bike-demand`): ________
-- Members: ________
-- Current driver / reviewer / evidence recorder: ________
-- Fourth member's temporary responsibility, if applicable: ________
+- Team and repository (`mlops-<session>-<team-name>-bike-demand`): mlops-fri2-alna-bike-demand
+- Members: Laroche22, BoutalebAnas, nouhasantir, Wanying0421
+- Current driver / reviewer / evidence recorder: Driver: BoutalebAnas, Reviewer: nouhasentir, Evidence recorder: Wanying0421
+- Fourth member's temporary responsibility, if applicable: Laroche22: repository setup and diagnostic
 
 ## Workflow
 
@@ -17,5 +17,5 @@
 ## Support and handover
 
 - Approved support route / supported workstation: ________
-- How to report a setup or repository-access blocker: ________
-- Next driver and unfinished work: ________
+- How to report a setup or repository-access blocker: Post the exact command and error message in the team channel. If setup is still blocked after 5 minutes, contact the instructor.
+- Next driver and unfinished work: Wanying0421
