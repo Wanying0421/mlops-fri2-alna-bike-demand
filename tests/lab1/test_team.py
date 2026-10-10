@@ -16,3 +16,10 @@ def test_joins_whitespace_with_hyphens():
 def test_rejects_blank_names():
     with pytest.raises(ValueError, match="non-whitespace"):
         normalize_team_slug("   ")
+
+
+def test_normalize_team_slug_rejects_none():
+    # None is not a string: None.strip() would raise AttributeError
+    # but it must raise ValueError
+    with pytest.raises(ValueError):
+        normalize_team_slug(None)
