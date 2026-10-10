@@ -5,4 +5,4 @@ def normalize_team_slug(team_name: str) -> str:
         )
     # split handles all whitespaces (spaces, tabs, newlines)
     # and collapses multiples ones into one hyphen
-    return "-".join(team_name.split()).lower() 
+    return "-".join(team_name.split()).lower()
