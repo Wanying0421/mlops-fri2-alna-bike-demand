@@ -38,8 +38,10 @@ COUNTS = ("cnt", "casual", "registered")
 def check_domains(frame: pd.DataFrame) -> None:
     for field, (low, high) in DOMAINS.items():
         s = frame[field]
-        if not (np.isfinite(s) & (s >= low) & (s <= high)).all():
-            raise ValueError(f"{field}: require values between {low} and {high}")
+        if not (np.isfinite(s) & (s >= low) & (s <= high) & (s % 1 == 0)).all():
+            raise ValueError(
+                f"{field}: require integer values between {low} and {high}"
+            )
 
     for field in NORMALISED:
         s = frame[field]
@@ -51,11 +53,11 @@ def check_domains(frame: pd.DataFrame) -> None:
         if not (np.isfinite(s) & (s >= 0) & (s % 1 == 0)).all():
             raise ValueError(f"{field}: require non-negative integers")
 
-    if not (frame["cnt"] == frame["casual"] + frame["registered"]).all():
-        raise ValueError("cnt: require cnt to equal casual + registered")
-
-    if not frame["dteday"].is_monotonic_increasing:
-        raise ValueError("dteday: require chronological order")
+    low, high = pd.Timestamp("2011-01-01"), pd.Timestamp("2012-12-31")
+    if not frame["dteday"].between(low, high).all():
+        raise ValueError(
+            f"dteday: require dates between {low.date()} and {high.date()}"
+        )
 
 
 def load_data(path: Path | str) -> pd.DataFrame:

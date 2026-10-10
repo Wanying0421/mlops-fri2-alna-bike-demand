@@ -46,7 +46,11 @@ def load_config(path: Path) -> dict:
 
 
 def select_features(frame: pd.DataFrame, features: list[str]) -> pd.DataFrame:
-    return frame.loc[:, features]
+    if list(features) != list(FEATURES):
+        raise ValueError(
+            "features: require exactly the twelve predictors in the course order"
+        )
+    return frame.loc[:, list(FEATURES)]
 
 
 def compare_mean(

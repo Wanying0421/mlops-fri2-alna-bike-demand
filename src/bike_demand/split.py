@@ -15,10 +15,17 @@ def split_data(frame: pd.DataFrame) -> dict[str, pd.DataFrame]:
         mask = (frame["dteday"] >= pd.to_datetime(start)) & (
             frame["dteday"] <= pd.to_datetime(end)
         )
-        part = frame.loc[mask].sort_values("dteday")
+        part = frame.loc[mask].sort_values(["dteday", "hr", "instant"])
         if part.empty:
-            raise ValueError(f"Partition {name} is empty")
+            raise ValueError(f"Partition {name} must be nonempty")
         partitions[name] = part
+
+    total = sum(len(part) for part in partitions.values())
+    if total != len(frame):
+        raise ValueError(
+            f"Partitions are not complete: {total} rows in partitions "
+            f"but {len(frame)} rows in the input"
+        )
     return partitions
 
 
