@@ -35,7 +35,7 @@ not an individual's graded Week 1 report.
   - `uv run --locked pytest -q -m infra` -> Passed
   - `uv run --locked pytest -q -m lab1` -> Passed (after fix)
 - Intentional exercise failure versus infrastructure failures: `pytest -m lab1` failed initially due to the intentional bug in `normalize_team_slug`; no infrastructure failures occurred.
-- CI check names, actual statuses and checked revision: `ruff check`, `pytest -m infra`, and `pytest -m lab1` all reported successful green checks on commit `a1b2c3d`.
+- CI check names, actual statuses and checked revision: `ruff check`, `pytest -m infra`, and `pytest -m lab1` all reported successful green checks on commit `ff0d9ae`.
 - Starter/reference/collaborator/other assistance: Course starter package and team collaboration.
 
 ## Lab 2 handover
