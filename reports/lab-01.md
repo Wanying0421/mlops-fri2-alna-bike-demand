@@ -47,10 +47,14 @@ not an individual's graded Week 1 report.
 
 ## Screenshots
 
-Save images in `reports/images/` and embed them below, for example
-`![PR checks on a1b2c3d](images/lab-01-pr-checks.png)`. Add one line saying what each
-image shows and which commit or pull request it belongs to. Include at least the
-failing and the passing `lab1` run, and the pull request checks. Crop to the
-relevant part and hide tokens, passwords and personal data.
+- ![Local pytest passing](images/lab-01-passing-test.png)
+  *Local `pytest -m lab1` passing with 4 test cases on branch `lab-01-workflow`.*
 
-- Image and caption: ________
+- ![Peer review conversation](images/lab-01-peer-review.png)
+  *Peer review on PR #1 between Nouha (Reviewer) requesting code formatting and Anas (Author) confirming the fix.*
+
+- ![Initial CI failure](images/lab-01-failing-ci.png)
+  *Initial remote CI check failure caused by `ruff format --check` before applying formatting fix.*
+
+- ![Final CI checks passing](images/lab-01-pr-checks.png)
+  *Final GitHub Actions checks passing on PR #1 ready for manual merge.*
