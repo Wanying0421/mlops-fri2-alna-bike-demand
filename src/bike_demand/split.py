@@ -10,10 +10,16 @@ WINDOWS = {
 
 
 def split_data(frame: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    raise NotImplementedError(
-        "TODO(Week 1, Lab 2): assign sorted, nonempty, disjoint and "
-        "complete partitions. See README 'Expected failures'."
-    )
+    partitions = {}
+    for name, (start, end) in WINDOWS.items():
+        mask = (frame["dteday"] >= pd.to_datetime(start)) & (
+            frame["dteday"] <= pd.to_datetime(end)
+        )
+        part = frame.loc[mask].sort_values("dteday")
+        if part.empty:
+            raise ValueError(f"Partition {name} is empty")
+        partitions[name] = part
+    return partitions
 
 
 def partition_summary(partitions: dict[str, pd.DataFrame]) -> dict:
