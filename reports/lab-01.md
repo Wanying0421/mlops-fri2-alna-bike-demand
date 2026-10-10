@@ -25,7 +25,7 @@ not an individual's graded Week 1 report.
 
 ## Reviewed change and checks
 
-- Branch, pull request and checked commit: Branch `lab-01-workflow`, Pull Request #1, Checked commit `a1b2c3d`.
+- Branch, pull request and checked commit: Branch `lab-01-workflow`, Pull Request #1, Checked commit `ff0d9ae`.
 - Substantive change and responsible contributor: Fixed `normalize_team_slug` helper function in `src/bike_demand/team.py` by Anas.
 - Additional test and why it is useful: Added test case for rejecting `None` and tabs/whitespace in `tests/lab1/test_team.py` by Anas, protecting against invalid edge cases not covered by starter tests.
 - Reviewer observation, response and merge status: Nouha reviewed the PR and requested edge-case test coverage; Anas updated the tests; Wanying verified local/remote checks and manually merged PR #1 into `main`.
