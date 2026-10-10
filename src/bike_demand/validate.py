@@ -36,28 +36,28 @@ COUNTS = ("cnt", "casual", "registered")
 
 
 def check_domains(frame: pd.DataFrame) -> None:
-    for col, (low, high) in DOMAINS.items():
-        vals = frame[col]
-        if not (np.isfinite(vals) & (vals % 1 == 0)).all():
-            raise ValueError(f"{col}: require integer values")
-        if not ((vals >= low) & (vals <= high)).all():
-            raise ValueError(f"{col}: values outside range [{low}, {high}]")
+    for field, (low, high) in DOMAINS.items():
+        s = frame[field]
+        if not (np.isfinite(s) & (s >= low) & (s <= high) & (s % 1 == 0)).all():
+            raise ValueError(
+                f"{field}: require integer values between {low} and {high}"
+            )
 
-    for col in NORMALISED:
-        vals = frame[col]
-        if not (np.isfinite(vals) & (vals >= 0.0) & (vals <= 1.0)).all():
-            raise ValueError(f"{col}: values outside range [0, 1]")
+    for field in NORMALISED:
+        s = frame[field]
+        if not (np.isfinite(s) & (s >= 0) & (s <= 1)).all():
+            raise ValueError(f"{field}: require normalized values between 0 and 1")
 
-    for col in COUNTS:
-        vals = frame[col]
-        if not (np.isfinite(vals) & (vals >= 0) & (vals % 1 == 0)).all():
-            raise ValueError(f"{col}: require nonnegative integer values")
+    for field in COUNTS:
+        s = frame[field]
+        if not (np.isfinite(s) & (s >= 0) & (s % 1 == 0)).all():
+            raise ValueError(f"{field}: require non-negative integers")
 
-    min_date = pd.Timestamp("2011-01-01")
-    max_date = pd.Timestamp("2012-12-31")
-    dates = frame["dteday"]
-    if not ((dates >= min_date) & (dates <= max_date)).all():
-        raise ValueError("dteday: dates outside interval [2011-01-01, 2012-12-31]")
+    low, high = pd.Timestamp("2011-01-01"), pd.Timestamp("2012-12-31")
+    if not frame["dteday"].between(low, high).all():
+        raise ValueError(
+            f"dteday: require dates between {low.date()} and {high.date()}"
+        )
 
 
 def load_data(path: Path | str) -> pd.DataFrame:

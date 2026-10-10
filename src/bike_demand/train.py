@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import yaml
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 
 from bike_demand.preflight import check_snapshot, sha256
@@ -45,26 +46,30 @@ def load_config(path: Path) -> dict:
 
 
 def select_features(frame: pd.DataFrame, features: list[str]) -> pd.DataFrame:
-    raise NotImplementedError(
-        "TODO(Week 1, Lab 2): select only the ordered predictors, excluding "
-        "labels and identities. See README 'Expected failures'."
-    )
+    if list(features) != list(FEATURES):
+        raise ValueError(
+            "features: require exactly the twelve predictors in the course order"
+        )
+    return frame.loc[:, list(FEATURES)]
 
 
 def compare_mean(
     train_target: pd.Series, validation_target: pd.Series
 ) -> tuple[float, float]:
-    raise NotImplementedError(
-        "TODO(Week 1, Lab 2): fit the comparator on training targets and "
-        "compute validation MAE. See README 'Expected failures'."
-    )
+    mean = float(train_target.mean())
+    predictions = np.full_like(validation_target, mean, dtype=float)
+    mae = float(mean_absolute_error(validation_target, predictions))
+    return mean, mae
 
 
 def fit_evaluate(train: pd.DataFrame, validation: pd.DataFrame, config: dict):
-    raise NotImplementedError(
-        "TODO(Week 1, Lab 2): fit the RF on train and evaluate only on "
-        "validation rows. See README 'Expected failures'."
-    )
+    model = RandomForestRegressor(**config["model"])
+    X_train = select_features(train, config["features"])
+    model.fit(X_train, train["cnt"])
+    X_validation = select_features(validation, config["features"])
+    predictions = model.predict(X_validation)
+    mae = float(mean_absolute_error(validation["cnt"], predictions))
+    return model, predictions, mae
 
 
 def reload_validation(
@@ -202,7 +207,7 @@ def main() -> int:
     try:
         result = train_baseline(Path.cwd(), args.config)
     except (ValueError, OSError, NotImplementedError) as error:
-        parser.exit(1, f"Training failed: {error}\n")
+        parser.exit(1, f"Validation failed: {error}\n")
     print(json.dumps(result, indent=2))
     return 0
 

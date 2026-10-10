@@ -10,26 +10,22 @@ WINDOWS = {
 
 
 def split_data(frame: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    sorted_frame = frame.sort_values(
-        by=["dteday", "hr", "instant"], ascending=True
-    ).reset_index(drop=True)
-
-    partitions: dict[str, pd.DataFrame] = {}
-    for name, (start_str, end_str) in WINDOWS.items():
-        start = pd.Timestamp(start_str)
-        end = pd.Timestamp(end_str)
-        mask = (sorted_frame["dteday"] >= start) & (sorted_frame["dteday"] <= end)
-        part = sorted_frame.loc[mask].reset_index(drop=True)
+    partitions = {}
+    for name, (start, end) in WINDOWS.items():
+        mask = (frame["dteday"] >= pd.to_datetime(start)) & (
+            frame["dteday"] <= pd.to_datetime(end)
+        )
+        part = frame.loc[mask].sort_values(["dteday", "hr", "instant"])
         if part.empty:
             raise ValueError(f"Partition {name} must be nonempty")
         partitions[name] = part
 
-    total_partition_rows = sum(len(p) for p in partitions.values())
-    if total_partition_rows != len(sorted_frame):
+    total = sum(len(part) for part in partitions.values())
+    if total != len(frame):
         raise ValueError(
-            f"Split is not complete: {total_partition_rows} rows assigned out of {len(sorted_frame)}"
+            f"Partitions are not complete: {total} rows in partitions "
+            f"but {len(frame)} rows in the input"
         )
-
     return partitions
 
 
