@@ -47,14 +47,12 @@ not an individual's graded Week 1 report.
 
 ## Screenshots
 
-- ![Local pytest passing](images/lab-01-passing-test.png)
+## Screenshots
+- ![Local pytest passing](images/lab-01-passing-test.jpeg)
   *Local `pytest -m lab1` passing with 4 test cases on branch `lab-01-workflow`.*
-
-- ![Peer review conversation](images/lab-01-peer-review.png)
+- ![Peer review conversation](images/lab-01-peer-review.jpeg)
   *Peer review on PR #1 between Nouha (Reviewer) requesting code formatting and Anas (Author) confirming the fix.*
-
-- ![Initial CI failure](images/lab-01-failing-ci.png)
+- ![Initial CI failure](images/lab-01-failing-ci.jpeg)
   *Initial remote CI check failure caused by `ruff format --check` before applying formatting fix.*
-
-- ![Final CI checks passing](images/lab-01-pr-checks.png)
+- ![Final CI checks passing](images/lab-01-pr-checks.jpeg)
   *Final GitHub Actions checks passing on PR #1 ready for manual merge.*
