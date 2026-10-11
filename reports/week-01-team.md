@@ -115,3 +115,9 @@ pytest -v tests/exercise/test_fault_b.py → 1 passed in 0.60s.
 
 ![Lab 02 Fault B rejection](images/lab-02-fault-b-rejection.jpeg)
 load_data on fault-b-noninteger-month.csv raises ValueError: "mnth: require integer values between 1 and 12".
+
+![MLflow run random_forest](images/lab-02-mlflow-run-rf.jpeg)
+MLflow run random_forest : Run ID 7f695a0798aa4f60bdd89bab985c9cdb, validation_mae 86.84, training_commit 450ec69, working_tree_dirty False.
+
+![MLflow runs table](images/lab-02-mlflow-runs.jpeg)
+MLflow Runs table : naive_train_mean (MAE 154.23) and random_forest (MAE 86.84) on commit 450ec69.
