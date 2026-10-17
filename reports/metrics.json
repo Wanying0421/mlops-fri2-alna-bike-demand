@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-10-10T17:56:14.837460+00:00",
-  "training_commit": "2cdf30b7312d666e02b60d024b73f1822029f2ae",
+  "timestamp": "2026-10-17T17:32:03.938491+00:00",
+  "training_commit": "14801a9de1a67f31b709c115c60eca0854ea93fd",
   "working_tree_dirty": true,
   "data_sha256": "e03de4ee4ef4dc376ac6e04bf829673c6269e8eba5c60fa121640fa2f829504f",
   "features": [
@@ -77,17 +77,17 @@
     "verbose": 0,
     "warm_start": false
   },
-  "model_version": "baseline-b74e45527de6",
-  "model_run_id": "25ca46c479b1409d9ebdffb025818827",
-  "model_sha256": "e90590201ed371b0c241b035523f294c024032f4b5d799690d22d02df0ed42de",
-  "naive_run_id": "1256f0a845b448cf85a3bde490b33a0a",
+  "model_version": "baseline-b5aca3bc29f1",
+  "model_run_id": "44c1025c0f8646f5bd6232f579f82645",
+  "model_sha256": "fd98ceafc57a5babce61ce703cbf9cb8d1f83c6820b0b34fe30ad1a0fc49c304",
+  "naive_run_id": "3ae46393e5584dd4b6efff1bbf27b50e",
   "train_mean": 143.79444765760556,
   "validation_mae": {
     "naive_train_mean": 154.23179306864967,
-    "random_forest": 86.61612269374554
+    "random_forest": 86.84685685591091
   },
   "readback": {
-    "reload_mae": 86.61612269374554,
+    "reload_mae": 86.84685685591091,
     "reload_mae_delta": 0.0,
     "metadata_matches": true,
     "logged_model_bytes_match": true,
