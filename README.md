@@ -76,3 +76,72 @@ docker run --name temp-container mlops-baseline:lab3
 docker cp temp-container:/app/artifacts ./out
 docker rm temp-container
 ```
+## lab 4: API container
+
+A containerized MLOps project for predicting bike-sharing demand using Python, `uv`, FastAPI, and Docker.
+
+
+### Project Structure
+
+- `src/bike_demand/`: Core package containing the pipeline scripts (training, data preflight, validation) and the prediction API.
+- `configs/`: Configuration YAML files for training and model baselines.
+- `tests/`: Automated unit and integration tests.
+- `Dockerfile`: Optimized container setup for running the service.
+
+### Prerequisites & Installation
+
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/Wanying0421/mlops-fri2-alna-bike-demand.git]
+   cd mlops-fri2-alna-bike-demand
+   ```
+Install dependencies:
+
+```Bash
+uv sync --locked
+```
+### Running Locally
+1. Model Training
+To run the baseline training pipeline locally:
+
+```Bash
+uv run python -m bike_demand.train --config configs/baseline.yaml
+```
+2. Running Tests
+To execute the test suite using pytest:
+
+```Bash
+uv run pytest -q
+```
+
+### Docker Containerization
+The application is fully containerized using Docker, leveraging uv for a reproducible and clean environment.
+
+1. Build the Docker Image
+From the root directory of the project, run:
+
+```Bash
+docker build -t bike-demand:lab4 .
+```
+2. Run the Container
+Start the container and expose port 8000:
+
+```Bash
+docker run --rm -p 127.0.0.1:8000:8000 bike-demand:lab4
+```
+### API Endpoints & Usage
+Once the container or local server is running, you can interact with the API:
+
+Health Check:
+
+```Bash
+curl localhost:8000/health
+```
+Make a Prediction (POST /predict):
+
+```Bash
+curl -X POST localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"season": 1, "mnth": 1, "holiday": 0, "yr": 0, "hr": 10, "weekday": 1, "workingday": 1
+```
