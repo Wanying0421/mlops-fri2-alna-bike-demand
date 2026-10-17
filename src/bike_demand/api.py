@@ -1,3 +1,4 @@
+
 import json
 import os
 from contextlib import asynccontextmanager
@@ -119,3 +120,4 @@ def predict(payload: BikePredictionRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
