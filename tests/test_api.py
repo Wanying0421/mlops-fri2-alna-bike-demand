@@ -1,7 +1,6 @@
 import pytest
-from pydantic import ValidationError
-
 from bike_demand.api import PredictRequest
+from pydantic import ValidationError
 
 
 @pytest.fixture
