@@ -87,3 +87,80 @@ def test_missing_required_field_returns_422(client_without_model, valid_payload,
         error["loc"] == ["body", field] and error["type"] == "missing"
         for error in response.json()["detail"]
     )
+
+
+@pytest.fixture
+def loaded_model_case(monkeypatch, tmp_path, valid_payload):
+    import json
+
+    import joblib
+    import numpy as np
+    import pandas as pd
+    from sklearn.linear_model import LinearRegression
+
+    from bike_demand.validate import FEATURES
+
+    features = list(FEATURES)
+    training_frame = pd.DataFrame(np.eye(len(features)), columns=features)
+    targets = np.arange(1, len(features) + 1, dtype=float)
+
+    # This small model is a test fixture, not the evaluated baseline.
+    model = LinearRegression(fit_intercept=False).fit(training_frame, targets)
+
+    model_path = tmp_path / "model.joblib"
+    metadata_path = tmp_path / "model-metadata.json"
+    version = f"test-artifact-{tmp_path.name}"
+
+    joblib.dump(model, model_path)
+    metadata_path.write_text(
+        json.dumps({"model_version": version, "features": features}),
+        encoding="utf-8",
+    )
+
+    payload = {
+        **valid_payload,
+        "season": 3,
+        "yr": 1,
+        "mnth": 7,
+        "hr": 15,
+        "holiday": 0,
+    }
+    frame = pd.DataFrame([payload], columns=features)
+    expected = float(model.predict(frame)[0])
+    assert expected >= 0
+
+    monkeypatch.setenv("MODEL_PATH", str(model_path))
+
+    with TestClient(api.app) as client:
+        yield client, payload, version, expected
+
+
+def test_health_reports_loaded_model_version(loaded_model_case):
+    client, _, version, _ = loaded_model_case
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["model_version"] == version
+
+
+def test_predict_reports_loaded_model_version(loaded_model_case):
+    client, payload, version, _ = loaded_model_case
+    response = client.post("/predict", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["model_version"] == version
+
+
+def test_prediction_matches_saved_model(loaded_model_case):
+    import math
+
+    client, payload, _, expected = loaded_model_case
+    response = client.post("/predict", json=payload)
+
+    assert response.status_code == 200
+    prediction = response.json()["prediction"]
+    assert isinstance(prediction, (int, float))
+    assert not isinstance(prediction, bool)
+    assert math.isfinite(prediction)
+    assert prediction >= 0
+    assert prediction == pytest.approx(expected)
