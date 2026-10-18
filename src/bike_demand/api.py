@@ -10,7 +10,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# Global state to store the loaded model and its metadata version
 class ModelStore:
     def __init__(self):
         self.model: Optional[Any] = None
@@ -24,7 +23,6 @@ class ModelStore:
 model_store = ModelStore()
 
 
-# Pydantic request model with strict validation and forbidden extra fields
 class BikePredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -47,7 +45,6 @@ async def lifespan(app: FastAPI):
     model_path = Path(os.getenv("MODEL_PATH", "artifacts/model.joblib"))
     metadata_path = Path(os.getenv("METADATA_PATH", "artifacts/model-metadata.json"))
 
-    # Load version and feature names from model-metadata.json if present
     if metadata_path.exists():
         try:
             with open(metadata_path, "r", encoding="utf-8") as f:
@@ -61,7 +58,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Error reading metadata: {e}")
 
-    # Load model artifact
     if model_path.exists():
         try:
             artifact = joblib.load(model_path)
@@ -104,7 +100,6 @@ def predict(payload: BikePredictionRequest):
     try:
         data_dict = payload.model_dump()
 
-        # Build pandas DataFrame with strict column order from metadata if available
         if model_store.feature_names:
             df = pd.DataFrame([data_dict])[model_store.feature_names]
         else:
@@ -119,29 +114,3 @@ def predict(payload: BikePredictionRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
-
-from fastapi import FastAPI
-from pydantic import BaseModel, ConfigDict, Field
-
-app = FastAPI(title="Bike Demand API")
-
-
-class PredictRequest(BaseModel):
-    # Reject unlisted fields
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    # Integer constraints
-    season: int = Field(ge=1, le=4)
-    yr: int = Field(ge=0, le=1)
-    mnth: int = Field(ge=1, le=12)
-    hr: int = Field(ge=0, le=23)
-    holiday: int = Field(ge=0, le=1)
-    weekday: int = Field(ge=0, le=6)
-    workingday: int = Field(ge=0, le=1)
-    weathersit: int = Field(ge=1, le=4)
-
-    # Float constraints (0.0 to 1.0)
-    temp: float = Field(ge=0.0, le=1.0)
-    atemp: float = Field(ge=0.0, le=1.0)
-    hum: float = Field(ge=0.0, le=1.0)
-    windspeed: float = Field(ge=0.0, le=1.0)
