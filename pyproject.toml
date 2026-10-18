@@ -10,6 +10,9 @@ dependencies = [
     "joblib>=1.4,<2",
     "PyYAML>=6,<7",
     "numpy>=1.26,<3",
+    "fastapi>=0.110,<1.0",
+    "pydantic>=2.6,<3",
+    "uvicorn>=0.29,<1.0"
 ]
 
 [build-system]
