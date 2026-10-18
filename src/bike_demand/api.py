@@ -3,10 +3,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 app = FastAPI(title="Bike Demand API")
 
+
 class PredictRequest(BaseModel):
     # Reject unlisted fields
-    model_config = ConfigDict(extra="forbid", strict=True) 
-    
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     # Integer constraints
     season: int = Field(ge=1, le=4)
     yr: int = Field(ge=0, le=1)
@@ -16,7 +17,7 @@ class PredictRequest(BaseModel):
     weekday: int = Field(ge=0, le=6)
     workingday: int = Field(ge=0, le=1)
     weathersit: int = Field(ge=1, le=4)
-    
+
     # Float constraints (0.0 to 1.0)
     temp: float = Field(ge=0.0, le=1.0)
     atemp: float = Field(ge=0.0, le=1.0)
