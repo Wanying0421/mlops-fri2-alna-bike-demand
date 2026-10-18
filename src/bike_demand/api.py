@@ -1,4 +1,3 @@
-
 import json
 import os
 from contextlib import asynccontextmanager
@@ -9,6 +8,7 @@ import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # Global state to store the loaded model and its metadata version
 class ModelStore:
