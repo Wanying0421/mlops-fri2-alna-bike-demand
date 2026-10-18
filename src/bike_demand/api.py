@@ -10,7 +10,6 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # Global state to store the loaded model and its metadata version
 class ModelStore:
     def __init__(self):
