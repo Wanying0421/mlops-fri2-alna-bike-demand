@@ -1,10 +1,13 @@
+import json
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Optional
 
 import joblib
+import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Global state to store the loaded model and its metadata version
@@ -12,6 +15,7 @@ class ModelStore:
     def __init__(self):
         self.model: Optional[Any] = None
         self.model_version: Optional[str] = None
+        self.feature_names: Optional[list[str]] = None
 
     def is_loaded(self) -> bool:
         return self.model is not None and self.model_version is not None
@@ -20,8 +24,10 @@ class ModelStore:
 model_store = ModelStore()
 
 
-# Pydantic request model enforcing the 12 required training features and ranges
+# Pydantic request model with strict validation and forbidden extra fields
 class BikePredictionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     season: int = Field(..., ge=1, le=4)
     mnth: int = Field(..., ge=1, le=12)
     holiday: int = Field(..., ge=0, le=1)
@@ -36,42 +42,49 @@ class BikePredictionRequest(BaseModel):
     windspeed: float = Field(..., ge=0.0, le=1.0)
 
 
-# Startup lifecycle: load the saved model artifact and extract version from metadata (never train inside the service)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    model_path = os.getenv("MODEL_PATH", "artifacts/model.joblib")
+    model_path = Path(os.getenv("MODEL_PATH", "artifacts/model.joblib"))
+    metadata_path = Path(os.getenv("METADATA_PATH", "artifacts/model-metadata.json"))
 
-    if os.path.exists(model_path):
+    # Load version and feature names from model-metadata.json if present
+    if metadata_path.exists():
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                model_store.model_version = meta.get("model_version") or meta.get(
+                    "version"
+                )
+                model_store.feature_names = meta.get("features") or meta.get(
+                    "feature_names"
+                )
+        except Exception as e:
+            print(f"Error reading metadata: {e}")
+
+    # Load model artifact
+    if model_path.exists():
         try:
             artifact = joblib.load(model_path)
-            # Handle dictionary artifact containing model and metadata
             if isinstance(artifact, dict) and "model" in artifact:
                 model_store.model = artifact["model"]
-                model_store.model_version = artifact.get("metadata", {}).get(
-                    "version", "m-01"
-                )
+                if not model_store.model_version:
+                    model_store.model_version = artifact.get("metadata", {}).get(
+                        "version"
+                    )
             else:
                 model_store.model = artifact
-                model_store.model_version = "m-01"
-            print(f"Model loaded successfully. Version: {model_store.model_version}")
         except Exception as e:
             print(f"Error loading model: {e}")
-            model_store.model = None
-            model_store.model_version = None
-    else:
-        print(f"Warning: Model artifact not found at {model_path}.")
 
     yield
-    # Clean up model state on shutdown
     model_store.model = None
     model_store.model_version = None
+    model_store.feature_names = None
 
 
-# Initialize FastAPI application
 app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=lifespan)
 
 
-# GET /health endpoint: returns 200 only when a usable model is loaded, otherwise 503
 @app.get("/health")
 def health_check():
     if not model_store.is_loaded():
@@ -81,7 +94,6 @@ def health_check():
     return {"status": "healthy", "model_version": model_store.model_version}
 
 
-# POST /predict endpoint: returns a finite, non-negative prediction and model_version
 @app.post("/predict")
 def predict(payload: BikePredictionRequest):
     if not model_store.is_loaded():
@@ -90,28 +102,15 @@ def predict(payload: BikePredictionRequest):
         )
 
     try:
-        # Extract the 12 features in order for model prediction
-        features = [
-            [
-                payload.season,
-                payload.mnth,
-                payload.holiday,
-                payload.yr,
-                payload.hr,
-                payload.weekday,
-                payload.workingday,
-                payload.weathersit,
-                payload.temp,
-                payload.atemp,
-                payload.hum,
-                payload.windspeed,
-            ]
-        ]
+        data_dict = payload.model_dump()
 
-        # Run prediction using the loaded model
-        raw_pred = model_store.model.predict(features)[0]
+        # Build pandas DataFrame with strict column order from metadata if available
+        if model_store.feature_names:
+            df = pd.DataFrame([data_dict])[model_store.feature_names]
+        else:
+            df = pd.DataFrame([data_dict])
 
-        # Ensure the prediction is finite and non-negative
+        raw_pred = model_store.model.predict(df)[0]
         prediction_val = max(0.0, float(raw_pred))
 
         return {
