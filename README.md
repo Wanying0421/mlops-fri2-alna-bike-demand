@@ -61,7 +61,7 @@ docker build -t mlops-baseline:lab3 .
 ## Since the Dockerfile starts the API service by default, you can provide your Lab 3 model (model.joblib) and metadata (model-metadata.json) by mounting them into the container and specifying their paths via environment variables:
 
 ```Bash
-docker run --rm -p 8000:8000 -v $(pwd)/artifacts:/app/artifacts -e MODEL_PATH=/app/artifacts/model.joblib -e MODEL_METADATA_PATH=/app/artifacts/model-metadata.json mlops-baseline:lab3
+docker run --rm -p 8000:8000 -v $(pwd)/artifacts:/app/artifacts -e MODEL_PATH=/app/artifacts/model.joblib -e METADATA_PATH=/app/artifacts/model-metadata.json mlops-baseline:lab3
 ```
 ## To test the prediction endpoint against the running container, use the following curl command with all 12 required fields and correct closing quotes:
 
@@ -89,7 +89,7 @@ curl -X POST "http://localhost:8000/predict" \
 ## To execute the core ML baseline pipeline explicitly instead of starting the default API service:
 
 ```Bash
-docker run --rm --entrypoint uv mlops-baseline:lab3 run python src/bike_demand/baseline.py
+docker run --rm --entrypoint uv mlops-baseline:lab3 run --locked python -m bike_demand.train --config configs/baseline.yaml
 ```
 ## Run the Test Suite
 ## To verify that all unit and integration tests pass successfully inside the container environment:
@@ -107,7 +107,7 @@ docker run --rm --entrypoint sh mlops-baseline:lab3 -c "rm uv.lock && uv sync --
 ## To copy generated artifacts, logs, or model outputs from a container instance:
 
 ```Bash
-docker run --name temp-container mlops-baseline:lab3
+docker run --name temp-container --entrypoint uv mlops-baseline:lab3 run --locked python -m bike_demand.train --config configs/baseline.yaml
 docker cp temp-container:/app/artifacts ./out
 docker rm temp-container
 ```
