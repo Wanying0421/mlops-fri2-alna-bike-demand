@@ -145,3 +145,14 @@ curl -X POST localhost:8000/predict \
   -H "Content-Type: application/json" \
   -d '{"season": 1, "mnth": 1, "holiday": 0, "yr": 0, "hr": 10, "weekday": 1, "workingday": 1
 ```
+Using PowerShell:
+
+```PowerShell
+Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -Body '{"season": 1,"mnth": 1, "holiday": 0, "yr": 0, "hr": 10, "weekday": 1, "workingday": 1, "weathersit": 1, "temp": 0.24, "atemp": 0.2879, "hum": 0.81, "windspeed": 0.0}' -ContentType "application/json"
+```
+### Containerized Testing
+To execute the test suite inside the built Docker container:
+
+```Bash
+docker run --rm bike-demand:lab4 uv run --locked pytest -q
+```
