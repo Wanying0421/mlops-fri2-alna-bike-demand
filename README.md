@@ -111,3 +111,5 @@ docker run --name temp-container --entrypoint uv mlops-baseline:lab3 run --locke
 docker cp temp-container:/app/artifacts ./out
 docker rm temp-container
 ```
+```
+

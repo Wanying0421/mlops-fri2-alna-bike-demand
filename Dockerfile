@@ -11,12 +11,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MLFLOW_DISABLE_TELEMETRY=true \
     DO_NOT_TRACK=true
 
-# The existing tracking code calls git, even when .git is absent.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-# Keep the dependency layer reusable when only application code changes.
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --locked --no-install-project
 
@@ -28,13 +26,13 @@ COPY README.md ./README.md
 COPY .github/workflows/ci.yml ./.github/workflows/ci.yml
 COPY reports/week-01-team.md ./reports/week-01-team.md
 
-# Retain dev dependencies: the same image must also run pytest and Ruff.
 RUN uv sync --locked
 
 ARG VCS_REF=unrecorded
 LABEL org.opencontainers.image.source="https://github.com/Wanying0421/mlops-fri2-alna-bike-demand" \
       org.opencontainers.image.revision="${VCS_REF}"
 
-# A run must use the installed environment without downloading anything.
 ENV UV_OFFLINE=1
-CMD ["uv", "run", "--locked", "python", "-m", "bike_demand.train", "--config", "configs/baseline.yaml"]
+
+EXPOSE 8000
+CMD ["uv", "run", "--locked", "uvicorn", "bike_demand.api:app", "--host", "0.0.0.0", "--port", "8000"]
