@@ -24,7 +24,6 @@ class ModelStore:
 model_store = ModelStore()
 
 
-# Pydantic request model with strict validation and forbidden extra fields
 class BikePredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -47,7 +46,6 @@ async def lifespan(app: FastAPI):
     model_path = Path(os.getenv("MODEL_PATH", "artifacts/model.joblib"))
     metadata_path = Path(os.getenv("METADATA_PATH", "artifacts/model-metadata.json"))
 
-    # Load version and feature names from model-metadata.json if present
     if metadata_path.exists():
         try:
             with open(metadata_path, "r", encoding="utf-8") as f:
@@ -61,7 +59,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Error reading metadata: {e}")
 
-    # Load model artifact
     if model_path.exists():
         try:
             artifact = joblib.load(model_path)
@@ -104,7 +101,6 @@ def predict(payload: BikePredictionRequest):
     try:
         data_dict = payload.model_dump()
 
-        # Build pandas DataFrame with strict column order from metadata if available
         if model_store.feature_names:
             df = pd.DataFrame([data_dict])[model_store.feature_names]
         else:
