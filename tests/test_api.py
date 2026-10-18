@@ -130,6 +130,7 @@ def loaded_model_case(monkeypatch, tmp_path, valid_payload):
     assert expected >= 0
 
     monkeypatch.setenv("MODEL_PATH", str(model_path))
+    monkeypatch.setenv("METADATA_PATH", str(metadata_path))
 
     with TestClient(api.app) as client:
         yield client, payload, version, expected
