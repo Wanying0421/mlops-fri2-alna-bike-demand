@@ -52,18 +52,18 @@ cd mlops-fri2-alna-bike-demand
 ```
 
 ### 1. Building the Docker Image
-##To build the container image from a clean checkout, run the following command from the root of the repository:
+## To build the container image from a clean checkout, run the following command from the root of the repository:
 
 ```bash
 docker build -t mlops-baseline:lab3 .
 ```
 ### 2. Running the API Container with a Model
-##Since the Dockerfile starts the API service by default, you can provide your Lab 3 model (model.joblib) and metadata (model-metadata.json) by mounting them into the container and specifying their paths via environment variables:
+## Since the Dockerfile starts the API service by default, you can provide your Lab 3 model (model.joblib) and metadata (model-metadata.json) by mounting them into the container and specifying their paths via environment variables:
 
 ```Bash
 docker run --rm -p 8000:8000 -v $(pwd)/artifacts:/app/artifacts -e MODEL_PATH=/app/artifacts/model.joblib -e MODEL_METADATA_PATH=/app/artifacts/model-metadata.json mlops-baseline:lab3
 ```
-##To test the prediction endpoint against the running container, use the following curl command with all 12 required fields and correct closing quotes:
+## To test the prediction endpoint against the running container, use the following curl command with all 12 required fields and correct closing quotes:
 
 ```Bash
 curl -X POST "http://localhost:8000/predict" \
@@ -86,13 +86,13 @@ curl -X POST "http://localhost:8000/predict" \
 
 ### 3. Running the Baseline and Tests
 ## Run the Baseline Pipeline
-##To execute the core ML baseline pipeline explicitly instead of starting the default API service:
+## To execute the core ML baseline pipeline explicitly instead of starting the default API service:
 
 ```Bash
 docker run --rm --entrypoint uv mlops-baseline:lab3 run python src/bike_demand/baseline.py
 ```
 ## Run the Test Suite
-##To verify that all unit and integration tests pass successfully inside the container environment:
+## To verify that all unit and integration tests pass successfully inside the container environment:
 
 ```Bash
 docker run --rm mlops-baseline:lab3 uv run --locked pytest -q
