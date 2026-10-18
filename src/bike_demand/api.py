@@ -5,7 +5,7 @@ app = FastAPI(title="Bike Demand API")
 
 class PredictRequest(BaseModel):
     # Reject unlisted fields
-    model_config = ConfigDict(extra="forbid") 
+    model_config = ConfigDict(extra="forbid", strict=True) 
     
     # Integer constraints
     season: int = Field(ge=1, le=4)
