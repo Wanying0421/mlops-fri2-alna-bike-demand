@@ -132,7 +132,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-[package.dev-dependencies]
 dev = [
     { name = "httpx2" },
     { name = "pytest" },
@@ -152,7 +151,6 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.29,<1.0" },
 ]
 
-[package.metadata.requires-dev]
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx2", specifier = ">=2.13.1" },
