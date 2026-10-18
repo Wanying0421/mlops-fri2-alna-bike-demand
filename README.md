@@ -37,42 +37,77 @@
 - `uv run --locked pytest -q -m lab1` : behavior contract respected
 - `uv run --locked pytest -q` : all tests pass
 
-## Lab 3: Containerized Baseline and Dependency Locking
+## Lab 3 & Lab 4: Containerized Baseline, Dependency Locking & Prediction API
 
 ### Prerequisites
 * Docker installed and running on your machine.
 * Git for checking out the exact revision.
 
+### Getting the Code
+Clone the repository:
+
+```Bash
+git clone https://github.com/Wanying0421/mlops-fri2-alna-bike-demand.git
+cd mlops-fri2-alna-bike-demand
+```
+
 ### 1. Building the Docker Image
-To build the container image from a clean checkout, run the following command from the root of the repository:
+## To build the container image from a clean checkout, run the following command from the root of the repository:
 
 ```bash
 docker build -t mlops-baseline:lab3 .
 ```
-#### 2. Running the Baseline and Tests
-## Run the Baseline Pipeline
-To execute the core ML baseline pipeline inside a fresh, isolated container:
+### 2. Running the API Container with a Model
+## Since the Dockerfile starts the API service by default, you can provide your Lab 3 model (model.joblib) and metadata (model-metadata.json) by mounting them into the container and specifying their paths via environment variables:
 
 ```Bash
-docker run --rm mlops-baseline:lab3
+docker run --rm -p 8000:8000 -v $(pwd)/artifacts:/app/artifacts -e MODEL_PATH=/app/artifacts/model.joblib -e METADATA_PATH=/app/artifacts/model-metadata.json mlops-baseline:lab3
+```
+## To test the prediction endpoint against the running container, use the following curl command with all 12 required fields and correct closing quotes:
+
+```Bash
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "season": 1,
+    "yr": 0,
+    "mnth": 1,
+    "hr": 0,
+    "holiday": 0,
+    "weekday": 6,
+    "workingday": 0,
+    "weathersit": 1,
+    "temp": 0.24,
+    "atemp": 0.2879,
+    "hum": 0.81,
+    "windspeed": 0.0
+  }'
+```
+
+### 3. Running the Baseline and Tests
+## Run the Baseline Pipeline
+## To execute the core ML baseline pipeline explicitly instead of starting the default API service:
+
+```Bash
+docker run --rm --entrypoint uv mlops-baseline:lab3 run --locked python -m bike_demand.train --config configs/baseline.yaml
 ```
 ## Run the Test Suite
-To verify that all unit and integration tests pass successfully inside the container environment:
+## To verify that all unit and integration tests pass successfully inside the container environment:
 
 ```Bash
 docker run --rm mlops-baseline:lab3 uv run --locked pytest -q
 ```
-### 3. Verifying Dependency Locking
+### 4. Verifying Dependency Locking
 ## To test that a stale or missing lockfile correctly halts execution rather than auto-regenerating:
 
 ```Bash
 docker run --rm --entrypoint sh mlops-baseline:lab3 -c "rm uv.lock && uv sync --locked"
 ```
-### 4. Retrieving Outputs
+### 5. Retrieving Outputs
 ## To copy generated artifacts, logs, or model outputs from a container instance:
 
 ```Bash
-docker run --name temp-container mlops-baseline:lab3
+docker run --name temp-container --entrypoint uv mlops-baseline:lab3 run --locked python -m bike_demand.train --config configs/baseline.yaml
 docker cp temp-container:/app/artifacts ./out
 docker rm temp-container
 ```
