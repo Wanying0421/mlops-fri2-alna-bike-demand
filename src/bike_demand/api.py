@@ -118,12 +118,13 @@ async def log_requests(request: Request, call_next):
 def health_check():
     """Health check endpoint to verify service and model status."""
     if not model_store.is_loaded():
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    git_sha = os.getenv("GIT_SHA", "unknown")
+        raise HTTPException(
+            status_code=503, detail="Service unavailable: Model not loaded"
+        )
     return {
         "status": "healthy",
         "model_version": model_store.model_version,
-        "git_sha": git_sha,
+        "git_sha": os.getenv("GIT_SHA", "unknown"),
     }
 
 
@@ -142,7 +143,7 @@ def predict(payload: BikePredictionRequest):
         return {
             "prediction": final_prediction,
             "model_version": model_store.model_version,
-            "git_sha": git_sha,
+            "git_sha": os.getenv("GIT_SHA", "unknown"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

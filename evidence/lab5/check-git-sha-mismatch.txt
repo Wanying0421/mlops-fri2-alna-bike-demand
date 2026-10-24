@@ -1,0 +1,15 @@
+﻿[PASS] GET /health HTTP status: expected=200 observed=200
+[PASS] GET /health JSON body: expected="object" observed="dict"
+[PASS] GET /health readiness: expected="healthy" observed="healthy"
+[PASS] GET /health model_version: expected="baseline-02591234b64c" observed="baseline-02591234b64c"
+[FAIL] GET /health git_sha: expected="0000000000000000000000000000000000000000" observed="0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463"
+[PASS] POST /predict valid input HTTP status: expected=200 observed=200
+[PASS] POST /predict valid input JSON body: expected="object" observed="dict"
+[PASS] POST /predict model_version: expected="baseline-02591234b64c" observed="baseline-02591234b64c"
+[FAIL] POST /predict git_sha: expected="0000000000000000000000000000000000000000" observed="0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463"
+[PASS] POST /predict prediction: expected="a finite non-negative number" observed=168.43515450291122
+[PASS] POST /predict hr=24 HTTP status: expected=422 observed=422
+[PASS] POST /predict hr=24 JSON body: expected="object" observed="dict"
+[PASS] POST /predict validation: expected="validation error on hr" observed="hr rejected"
+RESULT: FAIL; failed checks=2; exit code=1
+Exit code: 1
