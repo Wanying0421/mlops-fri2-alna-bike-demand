@@ -91,23 +91,27 @@ logger = logging.getLogger("bike_demand")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Middleware to log each request's event, status code, duration, and model version."""
+    """Middleware to log each request's event, status code, duration, and model version, including exceptions."""
     start_time = time.time()
-    response = await call_next(request)
-    duration_ms = round((time.time() - start_time) * 1000, 2)
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    except Exception:
+        status_code = 500
+        raise
+    finally:
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+        current_version = model_store.model_version or "unknown"
 
-    current_version = model_store.model_version or "unknown"
-
-    # Construct structured JSON log entry
-    log_data = {
-        "event": request.url.path,
-        "status": response.status_code,
-        "ms": duration_ms,
-        "model_version": current_version,
-    }
-
-    logger.info(json.dumps(log_data))
-    return response
+        log_data = {
+            "event": request.url.path,
+            "status": status_code,
+            "ms": duration_ms,
+            "model_version": current_version,
+        }
+        logger.info(json.dumps(log_data))
 
 
 @app.get("/health")
@@ -115,12 +119,17 @@ def health_check():
     """Health check endpoint to verify service and model status."""
     if not model_store.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
-    return {"status": "healthy", "model_version": model_store.model_version}
+    git_sha = os.getenv("GIT_SHA", "unknown")
+    return {
+        "status": "healthy",
+        "model_version": model_store.model_version,
+        "git_sha": git_sha,
+    }
 
 
 @app.post("/predict")
 def predict(payload: BikePredictionRequest):
-    """Predict bike demand based on input features."""
+    """Predict bike demand based on input features with non-negative guard."""
     if not model_store.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
     try:
@@ -128,9 +137,12 @@ def predict(payload: BikePredictionRequest):
         if model_store.feature_names:
             input_data = input_data[model_store.feature_names]
         prediction = model_store.model.predict(input_data)
+        final_prediction = max(0.0, float(prediction[0]))
+        git_sha = os.getenv("GIT_SHA", "unknown")
         return {
-            "prediction": float(prediction[0]),
+            "prediction": final_prediction,
             "model_version": model_store.model_version,
+            "git_sha": git_sha,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
