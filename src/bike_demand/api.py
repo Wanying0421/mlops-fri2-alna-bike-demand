@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # Define model version for logging and tracking
 MODEL_VERSION = "baseline-2baaf9359833"
 
+
 # Global state to store the loaded model and its metadata version
 class ModelStore:
     def __init__(self):
@@ -23,7 +24,9 @@ class ModelStore:
     def is_loaded(self) -> bool:
         return self.model is not None and self.model_version is not None
 
+
 model_store = ModelStore()
+
 
 class BikePredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -40,6 +43,7 @@ class BikePredictionRequest(BaseModel):
     atemp: float = Field(..., ge=0.0, le=1.0)
     hum: float = Field(..., ge=0.0, le=1.0)
     windspeed: float = Field(..., ge=0.0, le=1.0)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,6 +82,7 @@ async def lifespan(app: FastAPI):
     model_store.model_version = None
     model_store.feature_names = None
 
+
 # Initialize FastAPI app with lifespan
 app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=lifespan)
 
@@ -85,23 +90,25 @@ app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=life
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("bike_demand")
 
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Middleware to log each request's event, status code, duration, and model version."""
     start_time = time.time()
     response = await call_next(request)
     duration_ms = round((time.time() - start_time) * 1000, 2)
-    
+
     # Construct structured JSON log entry
     log_data = {
         "event": request.url.path,
         "status": response.status_code,
         "ms": duration_ms,
-        "model_version": MODEL_VERSION
+        "model_version": MODEL_VERSION,
     }
-    
+
     logger.info(json.dumps(log_data))
     return response
+
 
 @app.get("/health")
 def health_check():
