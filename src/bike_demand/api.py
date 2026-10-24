@@ -1,13 +1,86 @@
-import time
 import json
 import logging
-from fastapi import FastAPI, Request
+import os
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, Optional
+
+import joblib
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel, ConfigDict, Field
 
 # Define model version for logging and tracking
 MODEL_VERSION = "baseline-2baaf9359833"
 
-# Initialize FastAPI app
-app = FastAPI()
+# Global state to store the loaded model and its metadata version
+class ModelStore:
+    def __init__(self):
+        self.model: Optional[Any] = None
+        self.model_version: Optional[str] = None
+        self.feature_names: Optional[list[str]] = None
+
+    def is_loaded(self) -> bool:
+        return self.model is not None and self.model_version is not None
+
+model_store = ModelStore()
+
+class BikePredictionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    season: int = Field(..., ge=1, le=4)
+    mnth: int = Field(..., ge=1, le=12)
+    holiday: int = Field(..., ge=0, le=1)
+    yr: int = Field(..., ge=0, le=1)
+    hr: int = Field(..., ge=0, le=23)
+    weekday: int = Field(..., ge=0, le=6)
+    workingday: int = Field(..., ge=0, le=1)
+    weathersit: int = Field(..., ge=1, le=4)
+    temp: float = Field(..., ge=0.0, le=1.0)
+    atemp: float = Field(..., ge=0.0, le=1.0)
+    hum: float = Field(..., ge=0.0, le=1.0)
+    windspeed: float = Field(..., ge=0.0, le=1.0)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    model_path = Path(os.getenv("MODEL_PATH", "artifacts/model.joblib"))
+    metadata_path = Path(os.getenv("METADATA_PATH", "artifacts/model-metadata.json"))
+
+    if metadata_path.exists():
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                model_store.model_version = meta.get("model_version") or meta.get(
+                    "version"
+                )
+                model_store.feature_names = meta.get("features") or meta.get(
+                    "feature_names"
+                )
+        except Exception as e:
+            print(f"Error reading metadata: {e}")
+
+    if model_path.exists():
+        try:
+            artifact = joblib.load(model_path)
+            if isinstance(artifact, dict) and "model" in artifact:
+                model_store.model = artifact["model"]
+                if not model_store.model_version:
+                    model_store.model_version = artifact.get("metadata", {}).get(
+                        "version"
+                    )
+            else:
+                model_store.model = artifact
+        except Exception as e:
+            print(f"Error loading model: {e}")
+
+    yield
+    model_store.model = None
+    model_store.model_version = None
+    model_store.feature_names = None
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=lifespan)
 
 # Configure basic logging to output single-line JSON
 logging.basicConfig(level=logging.INFO, format="%(message)s")
