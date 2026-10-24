@@ -7,8 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import joblib
-import pandas as pd
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 # Define model version for logging and tracking
