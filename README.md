@@ -169,3 +169,139 @@ docker rm temp-container
     * *Choice:* Triggering an invalid request or removing the model file leaves behind a clear `422 Unprocessable Entity` or `503` error status code alongside corresponding structured error traces in `docker logs`.
     * *Rejected:* Crashing the container with zero logging output.
     * *Why:* Validates that failure modes are observable, predictable, and understandable to a stranger or system operator.
+
+## Lab 6 — CI
+
+### What runs and what is required to merge
+
+`.github/workflows/ci.yml` defines `Lab 6 CI` with two ordered jobs:
+
+1. **Checks:** install from `uv.lock`, check Ruff lint and formatting, run the
+   preflight, then run `uv run --locked pytest -q` with a JUnit report.
+   This includes all tests discovered under `tests/`: infrastructure, team
+   helpers, data/split/baseline exercises and the API. The starting snapshot
+   contains 73 tests; new tests are discovered automatically.
+2. **Container:** after Checks succeeds, make a synthetic model fixture, build
+   the Docker image from the checked revision, run the complete suite in that
+   image, start its API, then run `check_deploy.py` from the runner over HTTP.
+   The expected model version and Git SHA are supplied before the API is called.
+
+Both jobs must be green on the revision being merged. Team review still controls
+the manual merge, including when the repository plan cannot enforce required
+checks through branch protection.
+
+### Reading the original workflow
+
+The previous workflow already ran on pushes to `main`, PRs targeting `main`, and
+manual dispatch. It used Ubuntu 24.04, a 15-minute limit, `contents: read`,
+disabled persisted checkout credentials and locked uv commands. It ran the
+preflight, Ruff, and only the `infra` and `lab1` pytest selections. It did not run
+the exercise/API tests or build a container. `checkout@v6` was a movable tag.
+
+The revised workflow keeps the safe setup and the existing uv version/pin,
+pins checkout and artifact upload to full commit SHAs, and runs the whole suite.
+`--strict-markers --strict-config` are already enabled in `pyproject.toml`.
+There are no test-selection filters, allowed failures, or retries of failing
+tests. The readiness wait only retries startup HTTP probes for a bounded time.
+
+### A model that a clean runner can actually obtain
+
+`artifacts/` is ignored by Git. The Dockerfile copies it, so a fresh checkout
+does not have the files needed for that COPY instruction.
+
+The Container job runs `ci/create_smoke_model.py` before the build. It creates a
+tiny constant model from synthetic input, with version `ci-smoke-<checked SHA>`.
+The helper refuses to overwrite a non-empty output directory. No dependency or
+lock file is changed, and no training or evaluation uses the course dataset.
+
+This image checks packaging, test execution, startup, HTTP validation and model/
+code identity. Its fixture is **not** the evaluated Lab 4 model, a deployable
+release candidate, or evidence of model quality. The deployment owner must use
+the approved real model for the separate Cloud Run delivery phase.
+
+### Initial README questions: choice, rejected option, and reason
+
+| Question | Choice | Rejected option | Reason |
+| --- | --- | --- | --- |
+| Coverage: what is not covered yet? | Run the complete existing suite and a container smoke check with a synthetic model; report this scope explicitly. | Claim that a passing API fixture check certifies the approved model or Cloud Run deployment. | A fixture demonstrates service behavior, not the real model's accuracy or a live cloud revision. The separately recorded baseline recomputation/tolerance and defect drill remain later team tasks. |
+| Machine: what does a clean runner lack? | Obtain dependencies through a locked install and create the clearly labelled smoke fixture on the runner. | Depend on a teammate's `.venv`, ignored model files or local MLflow database. | Only committed files are checked out. Laptop artifacts are not runner-produced evidence. |
+| Trigger: which changes start checks? | Check every PR, pushes to the team's integration branch `main`, and manual dispatch; use no path filters. | Check only pushes after a merge or omit tests for documentation changes. | PRs get feedback before integration; the merged revision is checked too, and README/workflow changes can affect reproducibility. |
+| Order: what should fail first? | Locked install, style, preflight, all tests, then the dependent Container job. | Build containers before finding basic style or test failures. | Cheap failures stop work early. `needs: checks` prevents the expensive job from starting when Checks fails. |
+| Evidence: what can CI claim about the model? | Identify the checked commit, built image ID and smoke model version, and keep runner-produced output. | Cite a laptop training run or the production model's metadata as proof that CI evaluated it. | CI can claim only the installation, tests, build and HTTP checks it performed on its own inputs. |
+
+### Reproduce the Checks job locally
+
+From the repository root, run these PowerShell commands one at a time. Stop at
+the first non-zero exit code and diagnose that command before continuing.
+
+```powershell
+$env:MLFLOW_DISABLE_TELEMETRY = "true"
+$env:DO_NOT_TRACK = "true"
+uv sync --locked
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked python -m bike_demand.preflight
+uv run --locked pytest -q --junitxml=ci-results/checks/pytest.xml
+```
+
+### Reproduce the Container job without using your local model
+
+After committing the changes, create a disposable checkout. This keeps your
+existing `artifacts/` model separate from the synthetic fixture.
+Run one command at a time and stop at the first failure. Docker Desktop must
+be running. The example publishes the API on loopback port 8004.
+
+```powershell
+$lab6ReviewPath = Join-Path $env:TEMP ("alna-ci-" + [guid]::NewGuid().ToString("N"))
+git worktree add --detach "$lab6ReviewPath" HEAD
+Push-Location "$lab6ReviewPath"
+$lab6ReviewSha = (git rev-parse HEAD).Trim()
+$lab6ReviewVersion = "ci-smoke-$lab6ReviewSha"
+$lab6ReviewImage = "alna-ci-smoke:$lab6ReviewSha"
+$env:MLFLOW_DISABLE_TELEMETRY = "true"
+$env:DO_NOT_TRACK = "true"
+uv sync --locked
+uv run --locked python ci/create_smoke_model.py --output-dir artifacts --git-sha $lab6ReviewSha
+docker build --build-arg "VCS_REF=$lab6ReviewSha" -t $lab6ReviewImage .
+docker image inspect $lab6ReviewImage --format '{{.Id}} {{json .Config.Labels}}'
+docker run --rm -e MLFLOW_DISABLE_TELEMETRY=true -e DO_NOT_TRACK=true $lab6ReviewImage uv run --locked pytest -q
+docker run -d --name lab6-ci-api -p 127.0.0.1:8004:8000 -e "GIT_SHA=$lab6ReviewSha" -e MODEL_PATH=/app/artifacts/model.joblib -e METADATA_PATH=/app/artifacts/model-metadata.json $lab6ReviewImage
+curl.exe --fail --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors --retry-max-time 60 --max-time 2 http://127.0.0.1:8004/health
+uv run --locked python check_deploy.py --base-url http://127.0.0.1:8004 --expected-model-version $lab6ReviewVersion --expected-git-sha $lab6ReviewSha
+docker logs lab6-ci-api
+```
+
+Save the output before cleanup. `docker rm --force lab6-ci-api` removes this
+named test container. `Pop-Location` returns to the original checkout; the
+temporary worktree can be removed after its evidence has been retained.
+
+### Logs, identities, and handover
+
+The default Bash shell uses `pipefail`, so piping output through `tee` does not
+turn a failed command into a successful step. Only evidence upload and cleanup
+use `always()`; the required tests and HTTP checker keep their original exits.
+MLflow telemetry is disabled throughout the workflow, as it is in the image.
+
+Each job uploads its `ci-results` text files and reports, including failures,
+under a run-specific artifact name with 14-day retention. The Container job
+records the checked SHA, image ID/labels, expected fixture version, fixture
+metadata, build output, inside-image tests, health response, external checker
+output and container logs. Model weights are not uploaded as evidence.
+
+Download text evidence into `evidence/lab6/` before it expires. For example,
+`gh run view RUN_ID --log-failed` reads the failed steps and
+`gh run view RUN_ID --log` reads the complete run; save their output as text.
+A run link alone is not a lasting record. Local runs and GitHub runner runs
+must be labelled separately.
+
+The tests owner adds the new regression/recompute tests and registers any new
+markers. The reviewer owns the independent defect drill. The release owner
+adds the main-only, green-run-gated Cloud Run deployment with keyless login,
+live identity verification and rollback evidence. Those results and the `m3`
+checkpoint must be documented only after they have actually been obtained.
+
+Workflow references:
+[GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax),
+[uv in GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/),
+[checkout v6.1.0](https://github.com/actions/checkout/releases/tag/v6.1.0),
+[upload-artifact v7.0.2](https://github.com/actions/upload-artifact/releases/tag/v7.0.2).
