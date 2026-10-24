@@ -24,6 +24,9 @@
 !reports/
 !reports/week-01-team.md
 
+!artifacts/
+!artifacts/**
+
 # Exclude local state and secrets even inside allowed directories.
 **/.venv
 **/.git
