@@ -7,11 +7,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 import joblib
-from fastapi import FastAPI, Request
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
-
-# Define model version for logging and tracking
-MODEL_VERSION = "baseline-2baaf9359833"
 
 
 # Global state to store the loaded model and its metadata version
@@ -98,12 +96,14 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     duration_ms = round((time.time() - start_time) * 1000, 2)
 
+    current_version = model_store.model_version or "unknown"
+
     # Construct structured JSON log entry
     log_data = {
         "event": request.url.path,
         "status": response.status_code,
         "ms": duration_ms,
-        "model_version": MODEL_VERSION,
+        "model_version": current_version,
     }
 
     logger.info(json.dumps(log_data))
@@ -112,5 +112,25 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint to verify service status."""
-    return {"status": "healthy", "model_version": MODEL_VERSION}
+    """Health check endpoint to verify service and model status."""
+    if not model_store.is_loaded():
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return {"status": "healthy", "model_version": model_store.model_version}
+
+
+@app.post("/predict")
+def predict(payload: BikePredictionRequest):
+    """Predict bike demand based on input features."""
+    if not model_store.is_loaded():
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    try:
+        input_data = pd.DataFrame([payload.model_dump()])
+        if model_store.feature_names:
+            input_data = input_data[model_store.feature_names]
+        prediction = model_store.model.predict(input_data)
+        return {
+            "prediction": float(prediction[0]),
+            "model_version": model_store.model_version,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
