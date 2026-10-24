@@ -1,0 +1,7 @@
+HTTP/1.1 503 Service Unavailable
+date: Sat, 24 Oct 2026 06:31:17 GMT
+server: uvicorn
+content-length: 50
+content-type: application/json
+
+{"detail":"Service unavailable: Model not loaded"}
