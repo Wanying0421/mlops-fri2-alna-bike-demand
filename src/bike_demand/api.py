@@ -1,12 +1,14 @@
 import json
+import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -79,44 +81,68 @@ async def lifespan(app: FastAPI):
     model_store.feature_names = None
 
 
+# Initialize FastAPI app with lifespan
 app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=lifespan)
+
+# Configure basic logging to output single-line JSON
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("bike_demand")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Middleware to log each request's event, status code, duration, and model version, including exceptions."""
+    start_time = time.time()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    except Exception:
+        status_code = 500
+        raise
+    finally:
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+        current_version = model_store.model_version or "unknown"
+
+        log_data = {
+            "event": request.url.path,
+            "status": status_code,
+            "ms": duration_ms,
+            "model_version": current_version,
+        }
+        logger.info(json.dumps(log_data))
 
 
 @app.get("/health")
 def health_check():
+    """Health check endpoint to verify service and model status."""
     if not model_store.is_loaded():
-        raise HTTPException(
-            status_code=503, detail="Service unavailable: Model not loaded"
-        )
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    git_sha = os.getenv("GIT_SHA", "unknown")
     return {
         "status": "healthy",
         "model_version": model_store.model_version,
-        "git_sha": os.getenv("GIT_SHA", "unknown"),
+        "git_sha": git_sha,
     }
 
 
 @app.post("/predict")
 def predict(payload: BikePredictionRequest):
+    """Predict bike demand based on input features with non-negative guard."""
     if not model_store.is_loaded():
-        raise HTTPException(
-            status_code=503, detail="Service unavailable: Model not loaded"
-        )
-
+        raise HTTPException(status_code=503, detail="Model not loaded")
     try:
-        data_dict = payload.model_dump()
-
+        input_data = pd.DataFrame([payload.model_dump()])
         if model_store.feature_names:
-            df = pd.DataFrame([data_dict])[model_store.feature_names]
-        else:
-            df = pd.DataFrame([data_dict])
-
-        raw_pred = model_store.model.predict(df)[0]
-        prediction_val = max(0.0, float(raw_pred))
-
+            input_data = input_data[model_store.feature_names]
+        prediction = model_store.model.predict(input_data)
+        final_prediction = max(0.0, float(prediction[0]))
+        git_sha = os.getenv("GIT_SHA", "unknown")
         return {
-            "prediction": prediction_val,
+            "prediction": final_prediction,
             "model_version": model_store.model_version,
-            "git_sha": os.getenv("GIT_SHA", "unknown"),
+            "git_sha": git_sha,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
