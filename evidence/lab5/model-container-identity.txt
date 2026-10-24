@@ -1,0 +1,1 @@
+﻿/alna-lab5-model sha256:a49ada5c8f79f0b5656adae31646d5a067a51f0ee59648e4ef1f4614fd2935e0 {"org.opencontainers.image.revision":"0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463","org.opencontainers.image.source":"https://github.com/Wanying0421/mlops-fri2-alna-bike-demand"} {"8000/tcp":[{"HostIp":"127.0.0.1","HostPort":"8003"}]}

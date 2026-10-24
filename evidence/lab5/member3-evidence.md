@@ -2,14 +2,17 @@
 
 ## Current status
 
-Local validation is partially complete. The image builds, the existing API tests
-pass, and an HTTP request from the host confirms that a container without a
-loaded model returns HTTP 503.
+Local external validation completed on 2026-10-24. The checker passed against a
+running Docker container with the real Lab 4 model and returned exit code 1 for
+each deliberately incorrect expected identity. No model was retrained.
 
-The next step is to run `check_deploy.py` against the real Lab 4 model. The local
-`artifacts` directory was empty, and the project search did not find a model
-artifact or its metadata. A teammate needs to provide the matching
-`model.joblib` and `model-metadata.json` files used for Lab 4.
+A teammate supplied `model.joblib` and its matching `model-metadata.json`, and
+confirmed the approved model version as `baseline-02591234b64c` before the HTTP
+checks. Both files were placed in the local `artifacts` directory and mounted
+read-only into the container. The earlier missing-model blocker is resolved.
+
+This evidence covers the local Docker service. The final Cloud Run deployment
+must be checked separately using its URL and its own approved image source SHA.
 
 ## Code and image identity
 
@@ -20,12 +23,17 @@ artifact or its metadata. A teammate needs to provide the matching
 | Image tag | `alna-lab5-check:local` |
 | Image ID reported by Docker | `sha256:a49ada5c8f79f0b5656adae31646d5a067a51f0ee59648e4ef1f4614fd2935e0` |
 | Image revision label | `0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463` |
-| Failure-test container | `alna-lab5-no-model` |
-| Host address | `http://127.0.0.1:8001` |
+| Approved model version | `baseline-02591234b64c` |
+| Model-test container | `alna-lab5-model` |
+| Model-test host address | `http://127.0.0.1:8003` |
 | Container port | `8000` |
+| Earlier missing-model container | `alna-lab5-no-model` |
+| Earlier missing-model host address | `http://127.0.0.1:8001` |
 
-The source commit above identifies the image used for these observations.
-Later commits that add evidence do not change this existing image's identity.
+The image revision label, runtime `git_sha` responses, and expected SHA matched
+the source commit above. Later commits that add evidence do not change this
+existing image's identity. `model-container-identity.txt` records the running
+container's image identity and loopback port binding.
 
 ## Implementation
 
@@ -55,13 +63,38 @@ to the commit actually used to build the image.
 | Existing API test suite inside the image | 24 tests passed in 6.58 seconds |
 | Host HTTP request to `/health`, without a model | HTTP 503, `Service unavailable: Model not loaded` |
 
-The API test result was observed in terminal output. The raw evidence files below
-record the image identity, the missing-model HTTP response, and container logs.
+The API test result was observed in terminal output; its raw terminal output was
+not saved. Those regression tests are separate from the external checks below.
+
+### External checks with the real model
+
+The checker ran in Windows PowerShell on the host and called the published port
+of the Docker container over HTTP.
+
+| Scenario | Observed checks | Overall result | Exit code |
+| --- | --- | --- | --- |
+| Approved model version and image source SHA | All checks passed | PASS | 0 |
+| Only expected model version changed to `incorrect-version` | Both endpoints reported the approved version; exactly two version checks failed | FAIL, as intended | 1 |
+| Approved version restored; only expected SHA changed to 40 zeros | Both endpoints reported the image source SHA; exactly two SHA checks failed | FAIL, as intended | 1 |
+
+In all three runs, `/health` returned HTTP 200 with `status=healthy`, valid
+`/predict` input returned HTTP 200 with a finite non-negative prediction, and
+`hr=24` was rejected with HTTP 422 identifying the `hr` field. The valid
+prediction was `168.43515450291122`.
+
+The negative runs changed only the checker's expectation. The service continued
+to answer successfully, while the checker rejected the mismatched identity.
+The three captured outputs include the independently observed process exit codes.
 
 ## Commands used
 
-These commands were run from the repository root in Windows PowerShell. The
-container was deliberately started without a model mount for the failure case.
+These commands were run from the repository root in Windows PowerShell.
+
+### Image build, regression tests, and earlier readiness failure
+
+At build time, `HEAD` was the source commit `0c77d36` shown above. The following
+records that build; a future build from different code needs its own source SHA.
+The first container was deliberately started without a model mount.
 
 ```powershell
 $deploySha = (git rev-parse HEAD).Trim()
@@ -79,6 +112,76 @@ docker logs alna-lab5-no-model 2>&1 | Set-Content -Encoding utf8 .\evidence\lab5
 docker image inspect alna-lab5-check:local --format '{{.Id}} {{json .Config.Labels}}' | Set-Content -Encoding utf8 .\evidence\lab5\image-identity.txt
 ```
 
+### Start the service with the supplied model
+
+Port 8002 was occupied by an older Lab 4 container. The failed new container was
+removed and recreated with the following loopback binding on port 8003.
+
+```powershell
+docker run -d --name alna-lab5-model `
+  -p 127.0.0.1:8003:8000 `
+  --mount "type=bind,source=$($PWD.Path)\artifacts,target=/app/artifacts,readonly" `
+  -e MODEL_PATH=/app/artifacts/model.joblib `
+  -e METADATA_PATH=/app/artifacts/model-metadata.json `
+  -e GIT_SHA=0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463 `
+  alna-lab5-check:local
+```
+
+The explicit SHA here belongs to this existing image. For another deployment,
+the image owner must supply the actual source SHA of that image.
+
+### Check the approved identity
+
+```powershell
+python .\check_deploy.py `
+  --base-url http://127.0.0.1:8003 `
+  --expected-model-version baseline-02591234b64c `
+  --expected-git-sha 0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463 |
+  Tee-Object -FilePath .\evidence\lab5\check-expected-identity.txt
+"Exit code: $LASTEXITCODE" | Tee-Object -FilePath .\evidence\lab5\check-expected-identity.txt -Append
+```
+
+Observed result: `PASS`, zero failed checks, process exit code `0`.
+
+### Deliberately mismatch only the expected model version
+
+```powershell
+python .\check_deploy.py `
+  --base-url http://127.0.0.1:8003 `
+  --expected-model-version incorrect-version `
+  --expected-git-sha 0c77d36b224f5fe899b2d18c90f9d6a1b8a1c463 |
+  Tee-Object -FilePath .\evidence\lab5\check-model-version-mismatch.txt
+"Exit code: $LASTEXITCODE" | Tee-Object -FilePath .\evidence\lab5\check-model-version-mismatch.txt -Append
+```
+
+Observed result: `FAIL`, two failed model-version checks, process exit code `1`.
+
+### Deliberately mismatch only the expected Git SHA
+
+```powershell
+python .\check_deploy.py `
+  --base-url http://127.0.0.1:8003 `
+  --expected-model-version baseline-02591234b64c `
+  --expected-git-sha 0000000000000000000000000000000000000000 |
+  Tee-Object -FilePath .\evidence\lab5\check-git-sha-mismatch.txt
+"Exit code: $LASTEXITCODE" | Tee-Object -FilePath .\evidence\lab5\check-git-sha-mismatch.txt -Append
+```
+
+Observed result: `FAIL`, two failed SHA checks, process exit code `1`. The all-zero
+value has valid 40-character SHA syntax, so this is a deployment-check failure,
+not a command-line validation error.
+
+### Capture the running container
+
+```powershell
+cmd /c "docker logs alna-lab5-model > evidence\lab5\model-container.log 2>&1"
+docker inspect alna-lab5-model --format '{{.Name}} {{.Image}} {{json .Config.Labels}} {{json .NetworkSettings.Ports}}' | Tee-Object -FilePath .\evidence\lab5\model-container-identity.txt
+```
+
+The log capture uses `cmd` redirection to preserve stdout and stderr without
+PowerShell's native-error formatting. The saved logs show application startup
+and three groups of HTTP 200, 200, and 422 responses, matching the checker runs.
+
 ## Raw evidence
 
 Keep this document in `evidence/lab5` with these files:
@@ -88,26 +191,33 @@ Keep this document in `evidence/lab5` with these files:
   JSON error body from the host request.
 - [Missing-model container logs](missing-model-container.log): captured container
   output for the failure run.
+- [Approved-identity check](check-expected-identity.txt): successful external
+  checks and process exit code 0.
+- [Model-version mismatch](check-model-version-mismatch.txt): expected versus
+  observed versions and process exit code 1.
+- [Git-SHA mismatch](check-git-sha-mismatch.txt): expected versus observed SHAs
+  and process exit code 1.
+- [Model-container logs](model-container.log): startup and request status logs
+  from the real-model container.
+- [Model-container identity](model-container-identity.txt): image ID, revision
+  label, source URL, and published loopback port.
 
-The failure demonstrates that the service refuses to report readiness when its
-model is unavailable. It does not establish a successful prediction or matching
-runtime model/code identities.
+The earlier missing-model failure demonstrates that the service refuses to
+report readiness when its model is unavailable. The later checker runs establish
+valid prediction behavior and identity comparisons with the real model. These
+captured container logs are Uvicorn/startup logs; structured JSON request logging
+will be assessed when Member 2's changes are integrated.
 
 ## Remaining validation and handover
 
-1. Obtain the real Lab 4 model and its matching metadata, including the approved
-   model version.
-2. Start a container with those files mounted read-only and the correct
-   `MODEL_PATH`, `METADATA_PATH`, and `GIT_SHA` settings.
-3. Run `check_deploy.py` from the host with the approved version and image source
-   SHA. Record its output and exit code 0.
-4. Change only the expected model version and verify exit code 1. Restore it,
-   change only the expected SHA to a different valid 40-character SHA, and verify
-   exit code 1 again. Save both outputs.
-5. Record the final container's logs and identity, and add the exact working check
-   command to the team's deployment instructions.
-6. Open the Member 3 pull request for review. If the model is still unavailable,
-   use a draft and retain the explicit blocker above.
+1. Commit these new evidence files and this updated document to the Member 3
+   branch, then update the existing pull request for review.
+2. Give the working check command to the README owner. Expected identities must
+   remain independent of the service response.
+3. After team integration, the deployment owner runs the checker against the
+   final live service URL using the approved model version and the final image's
+   source SHA, and records that deployment's results separately.
 
-The owner of the final deployment can run the same checker against its live
-service URL with the final approved model version and deployed image source SHA.
+Cloud Run verification, structured-logging integration, and PR review/merge are
+team follow-up work. This document does not claim a successful live cloud check,
+a passing remote CI run, or a merged pull request.

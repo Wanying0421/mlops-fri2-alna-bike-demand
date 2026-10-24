@@ -1,0 +1,17 @@
+   Building bike-demand @ file:///app
+      Built bike-demand @ file:///app
+Uninstalled 1 package in 5ms
+Installed 1 package in 5ms
+INFO:     Started server process [23]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.17.0.1:37736 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.17.0.1:37742 - "POST /predict HTTP/1.1" 200 OK
+INFO:     172.17.0.1:37750 - "POST /predict HTTP/1.1" 422 Unprocessable Entity
+INFO:     172.17.0.1:57510 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.17.0.1:57512 - "POST /predict HTTP/1.1" 200 OK
+INFO:     172.17.0.1:57524 - "POST /predict HTTP/1.1" 422 Unprocessable Entity
+INFO:     172.17.0.1:49006 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.17.0.1:49014 - "POST /predict HTTP/1.1" 200 OK
+INFO:     172.17.0.1:49016 - "POST /predict HTTP/1.1" 422 Unprocessable Entity
