@@ -1,0 +1,9 @@
+﻿   Building bike-demand @ file:///app
+      Built bike-demand @ file:///app
+Uninstalled 1 package in 2ms
+Installed 1 package in 2ms
+INFO:     Started server process [23]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.17.0.1:56810 - "GET /health HTTP/1.1" 503 Service Unavailable

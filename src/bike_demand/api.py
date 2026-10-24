@@ -88,7 +88,11 @@ def health_check():
         raise HTTPException(
             status_code=503, detail="Service unavailable: Model not loaded"
         )
-    return {"status": "healthy", "model_version": model_store.model_version}
+    return {
+        "status": "healthy",
+        "model_version": model_store.model_version,
+        "git_sha": os.getenv("GIT_SHA", "unknown"),
+    }
 
 
 @app.post("/predict")
@@ -112,6 +116,7 @@ def predict(payload: BikePredictionRequest):
         return {
             "prediction": prediction_val,
             "model_version": model_store.model_version,
+            "git_sha": os.getenv("GIT_SHA", "unknown"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
