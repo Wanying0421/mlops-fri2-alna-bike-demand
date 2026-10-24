@@ -1,0 +1,20 @@
+{
+  "model_version": "ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd",
+  "features": [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "temp",
+    "atemp",
+    "hum",
+    "windspeed"
+  ],
+  "source_commit": "f269d7655eca5e84320c3143a514c6866366cdfd",
+  "model_sha256": "398c67f9cf0b508594ac251597c40370067b26aa872e50a497a0cd638dead411",
+  "purpose": "CI-only synthetic fixture; not the evaluated or deployed baseline"
+}
