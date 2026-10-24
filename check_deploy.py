@@ -19,7 +19,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-
 VALID_INPUT = {
     "season": 2,
     "mnth": 6,
