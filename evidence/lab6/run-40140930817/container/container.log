@@ -1,0 +1,12 @@
+INFO:     Started server process [10]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+{"event": "/health", "status": 200, "ms": 1.16, "model_version": "ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd"}
+INFO:     172.17.0.1:58884 - "GET /health HTTP/1.1" 200 OK
+{"event": "/health", "status": 200, "ms": 0.5, "model_version": "ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd"}
+INFO:     172.17.0.1:58900 - "GET /health HTTP/1.1" 200 OK
+{"event": "/predict", "status": 200, "ms": 2.08, "model_version": "ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd"}
+INFO:     172.17.0.1:58916 - "POST /predict HTTP/1.1" 200 OK
+{"event": "/predict", "status": 422, "ms": 0.38, "model_version": "ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd"}
+INFO:     172.17.0.1:58928 - "POST /predict HTTP/1.1" 422 Unprocessable Entity

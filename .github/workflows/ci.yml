@@ -1,30 +1,164 @@
-name: Week 1 checks
+name: Lab 6 CI
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MLFLOW_DISABLE_TELEMETRY: "true"
+  DO_NOT_TRACK: "true"
+
 jobs:
-  infrastructure:
+  checks:
+    name: Checks
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out the tested revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+
+      - name: Record the source and initialize evidence
+        run: |
+          mkdir -p ci-results/checks
+          git rev-parse HEAD | tee ci-results/checks/commit.txt
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "Checked commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install the pinned uv version and Python
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
           version: "0.12.23"
           python-version: "3.12"
-      - run: uv sync --locked
-      - run: uv run --locked python -m bike_demand.preflight
-      - run: uv run --locked ruff check .
-      - run: uv run --locked ruff format --check .
-      - run: uv run --locked pytest -q -m infra
-      - run: uv run --locked pytest -q -m lab1
+
+      - name: Install from the existing lock file
+        run: uv sync --locked 2>&1 | tee ci-results/checks/install.txt
+
+      - name: Check lint
+        run: uv run --locked ruff check . 2>&1 | tee ci-results/checks/lint.txt
+
+      - name: Check formatting
+        run: uv run --locked ruff format --check . 2>&1 | tee ci-results/checks/format.txt
+
+      - name: Check the environment and frozen dataset
+        run: uv run --locked python -m bike_demand.preflight 2>&1 | tee ci-results/checks/preflight.txt
+
+      - name: Run the complete test suite
+        run: |
+          uv run --locked pytest -q --junitxml=ci-results/checks/pytest.xml \
+            2>&1 | tee ci-results/checks/pytest.txt
+
+      - name: Keep check evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-results/checks/
+          if-no-files-found: error
+          retention-days: 14
+
+  container:
+    name: Container
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI_IMAGE: alna-ci-smoke:${{ github.sha }}
+      CI_MODEL_VERSION: ci-smoke-${{ github.sha }}
+    steps:
+      - name: Check out the same revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Record the container check subject
+        run: |
+          mkdir -p ci-results/container
+          git rev-parse HEAD | tee ci-results/container/commit.txt
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          printf 'commit=%s\nexpected_model_version=%s\n' \
+            "$GITHUB_SHA" "$CI_MODEL_VERSION" | tee ci-results/container/identity.txt
+
+      - name: Install the pinned uv version and Python
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        with:
+          version: "0.12.23"
+          python-version: "3.12"
+
+      - name: Install from the existing lock file
+        run: uv sync --locked 2>&1 | tee ci-results/container/install.txt
+
+      - name: Create a CI-only model fixture on this runner
+        run: |
+          uv run --locked python ci/create_smoke_model.py \
+            --output-dir artifacts --git-sha "$GITHUB_SHA" \
+            2>&1 | tee ci-results/container/model-fixture.txt
+          cp artifacts/model-metadata.json ci-results/container/model-metadata.json
+
+      - name: Build and identify the image
+        run: |
+          docker build --build-arg "VCS_REF=$GITHUB_SHA" \
+            --iidfile ci-results/container/image-id.txt --tag "$CI_IMAGE" . \
+            2>&1 | tee ci-results/container/build.txt
+          docker image inspect "$CI_IMAGE" \
+            --format '{{.Id}} {{json .Config.Labels}}' \
+            | tee -a ci-results/container/identity.txt
+          printf 'Commit: `%s`\n\nImage: `%s`\n\nModel: `%s` (CI fixture only)\n' \
+            "$GITHUB_SHA" "$(cat ci-results/container/image-id.txt)" \
+            "$CI_MODEL_VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the complete test suite inside this image
+        run: |
+          docker run --rm -e MLFLOW_DISABLE_TELEMETRY=true -e DO_NOT_TRACK=true \
+            "$CI_IMAGE" uv run --locked pytest -q \
+            2>&1 | tee ci-results/container/pytest.txt
+
+      - name: Start the API and wait for readiness
+        run: |
+          docker run --detach --name lab6-ci-api --publish 127.0.0.1:8000:8000 \
+            --env "GIT_SHA=$GITHUB_SHA" \
+            --env MODEL_PATH=/app/artifacts/model.joblib \
+            --env METADATA_PATH=/app/artifacts/model-metadata.json \
+            "$CI_IMAGE" | tee ci-results/container/container-id.txt
+          curl --fail --silent --show-error --retry 30 --retry-delay 1 \
+            --retry-connrefused --retry-all-errors --retry-max-time 60 --max-time 2 \
+            http://127.0.0.1:8000/health > ci-results/container/health.json
+
+      - name: Verify the running image from outside the container
+        run: |
+          uv run --locked python check_deploy.py \
+            --base-url http://127.0.0.1:8000 \
+            --expected-model-version "$CI_MODEL_VERSION" \
+            --expected-git-sha "$GITHUB_SHA" \
+            2>&1 | tee ci-results/container/external-check.txt
+
+      - name: Collect logs and remove the CI container
+        if: ${{ always() }}
+        run: |
+          if docker container inspect lab6-ci-api > /dev/null 2>&1; then
+            docker logs lab6-ci-api > ci-results/container/container.log 2>&1
+            docker rm --force lab6-ci-api
+          fi
+
+      - name: Keep container evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-results/container/
+          if-no-files-found: error
+          retention-days: 14

@@ -13,8 +13,11 @@ Run before opening a pull request:
 - `uv run --locked python -m bike_demand.preflight`
 - `uv run --locked ruff check .`
 - `uv run --locked ruff format --check .`
-- `uv run --locked pytest -q -m infra`
-- `uv run --locked pytest -q -m lab1`
+- `uv run --locked pytest -q`
+
+The complete suite includes infrastructure, team-helper, exercise and API tests.
+Pytest enforces the strict marker and configuration settings in `pyproject.toml`.
+See the README CI section for the isolated container check.
 
 ## PR + peer review
 
@@ -24,6 +27,8 @@ Run before opening a pull request:
 - The reviewer records at least one actionable observation.
 - The author responds to the observation.
 - Checks must be green on the same revision that will be merged.
+- Both `Checks` and `Container` in `Lab 6 CI` must pass. Uploading evidence after
+  a failure does not turn a failed check into a successful one.
 
 ## Who merges and when
 

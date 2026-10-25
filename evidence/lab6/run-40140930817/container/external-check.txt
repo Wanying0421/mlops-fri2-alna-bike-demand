@@ -1,0 +1,14 @@
+[PASS] GET /health HTTP status: expected=200 observed=200
+[PASS] GET /health JSON body: expected="object" observed="dict"
+[PASS] GET /health readiness: expected="healthy" observed="healthy"
+[PASS] GET /health model_version: expected="ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd" observed="ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd"
+[PASS] GET /health git_sha: expected="f269d7655eca5e84320c3143a514c6866366cdfd" observed="f269d7655eca5e84320c3143a514c6866366cdfd"
+[PASS] POST /predict valid input HTTP status: expected=200 observed=200
+[PASS] POST /predict valid input JSON body: expected="object" observed="dict"
+[PASS] POST /predict model_version: expected="ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd" observed="ci-smoke-f269d7655eca5e84320c3143a514c6866366cdfd"
+[PASS] POST /predict git_sha: expected="f269d7655eca5e84320c3143a514c6866366cdfd" observed="f269d7655eca5e84320c3143a514c6866366cdfd"
+[PASS] POST /predict prediction: expected="a finite non-negative number" observed=42.0
+[PASS] POST /predict hr=24 HTTP status: expected=422 observed=422
+[PASS] POST /predict hr=24 JSON body: expected="object" observed="dict"
+[PASS] POST /predict validation: expected="validation error on hr" observed="hr rejected"
+RESULT: PASS; failed checks=0; exit code=0
