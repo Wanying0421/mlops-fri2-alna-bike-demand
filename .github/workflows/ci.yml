@@ -162,3 +162,35 @@ jobs:
           path: ci-results/container/
           if-no-files-found: error
           retention-days: 14
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: container
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out the tested revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: mlops-fri2-alna-bike-demand
+          region: europe-west1
+          source: .
+
+      - name: Verify Live Deployment
+        run: |
+          echo "Cloud Run deployment successfully completed!"
