@@ -36,19 +36,56 @@ Fast-Fail Architecture: Enforced explicit 503 service status returns during mode
 ### 5.Blockers / Missing Evidence
 Status: All blockers resolved. Container builds, local endpoint tests, and automated integration checks successfully passed without errors.
 
-## MLOps Lab 6: Team Summary Report
+# Lab 6: Team Deployment & Operational Report
 
-### 1. Team Lab 6 Workflow & Division of Labor 
-* **Member 1 (CI Pipeline)**: Configured `.github/workflows/ci.yml` with strict least-privilege permissions, locked installs (`--locked`), Ruff formatting/linting, and preflight checks.
-* **Member 2 (Regression & Markers)**: Developed regression tests in `tests/`, registered strict pytest markers (`--strict-markers`), and defined measurement tolerances.
-* **Reviewer (Defect Drill)**: Injected a synthetic defect into a PR, captured the failing CI logs (Red run), and committed a repair to bring the pipeline back to Green.
-* **Leader (Cloud Run & Release)**: Configured the main-branch-gated Cloud Run continuous deployment workflow utilizing OIDC keyless authentication (`id-token`), verified the live URL, and pushed the annotated `m3` tag.
+- **Team Name**: `alna`
+- **Repository**: `mlops-fri2-alna-bike-demand`
+- **Deployment Platform**: Google Cloud Run (`europe-west1`)
+- **Service Name**: `mlops-fri2-alna-bike-demand`
 
-### 2. Lab 6 Key Deliverables & Evidence 
-* **CI Checks & Container Build**: Automated checks and container smoke tests running successfully on clean runners[cite: 6].
-* **Red-to-Green Defect Recovery**: Verified that synthetic defect injections are properly intercepted by CI and resolved via code repair.
-* **Cloud Run Delivery & Identity**: Successfully deployed to Cloud Run using keyless authentication with live URL identity verification.
-* **Milestone Tag**: Created and pushed the annotated `m3` tag to the official repository.
+---
 
-### 3. Visual Evidence / Screenshots
+## 1. Executive Summary & Pipeline Flow
+Our team established a 3-stage automated CI/CD pipeline using GitHub Actions to continuously validate and deliver the bike demand prediction service to Google Cloud Run.
 
+The execution sequence is structured as follows:
+1. **Checks Job**: Runs code formatting (Ruff), static checks, preflight verification, and the complete pytest suite under `tests/`.
+2. **Container Job**: Generates a synthetic model fixture, builds the Docker container, executes tests inside the container, and verifies local HTTP endpoints.
+3. **Deploy Job**: Triggers exclusively on `push` events to `main` to deploy the verified container image to Cloud Run using Workload Identity Federation (WIF).
+
+---
+
+## 2. Core Operational Guarantees (Gate, Identity, Proof, Undo)
+
+### Gate (Deployment Conditions)
+- **Constraint**: The `deploy` job relies on `needs: container` and a branch condition (`if: github.ref == 'refs/heads/main' && github.event_name == 'push'`).
+- **Guarantee**: Broken code or unmerged Pull Requests cannot reach production. All checks must turn green before deployment is possible.
+
+### Identity (Keyless Authentication)
+- **Mechanism**: Authenticates to GCP via Workload Identity Federation (WIF) using `google-github-actions/auth@v2` with `id-token: write`.
+- **Security**: No long-lived service account JSON keys are stored in repository secrets. Authentication relies entirely on short-lived OIDC tokens.
+
+### Proof (Live Verification)
+- **Verification**: Following Cloud Run deployment, an automated HTTP check (`check_deploy.py`) queries the live service endpoint.
+- **Assertion**: Ensures the live service's reported `git_sha` and `model_version` match the exact Git commit that triggered the build.
+
+### Undo (Rollback & Incident Recovery)
+- **Traffic Rollback**: Traffic can be instantly shifted to a previous revision via the GCP Console or `gcloud run services update-traffic`.
+- **Git Revert**: Merging a `git revert` on `main` triggers a fresh, reproducible build and redeployment of the prior stable state.
+
+---
+
+## 3. Evidence & Artifact Management
+- **Artifact Retention**: Test logs, JUnit reports, and container build outputs are uploaded as GitHub Actions artifacts with a 14-day retention window.
+- **Isolation**: Clean runners build dependencies strictly from `uv.lock`. Local environment artifacts (`.venv`, local models) are excluded to guarantee clean-room reproducibility.
+
+---
+
+## 4. Team Member Contribution Matrix
+
+| Member | Focus Area & Key Deliverables |
+| :--- | :--- |
+| **Member 1** | Pipeline structure, Ruff linting/formatting rules, and unit/contract test suites. |
+| **Member 2** | Containerization, Dockerfile optimizations, and in-container test execution. |
+| **Member 3** | Cloud Run service configuration, region setup (`europe-west1`), and GCP IAM roles. |
+| **Member 4** | Cloud Run automated deployment job, Workload Identity Federation (WIF) integration, and deployment verification. |
