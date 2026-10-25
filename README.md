@@ -326,3 +326,17 @@ Part 2: Tests, Defects & Tolerance Questions
 | **Failing / Records**<br>*(Can you make each test fail?)* | Yes, modifying the expected baseline output or altering input feature behavior forces an immediate failure, satisfying the red-to-green defect verification rule. | Passing tests by loosening assertions when code outputs change unexpectedly. | Muting or loosening assertions hides regressions instead of catching real defects. |
 | **Tolerance**<br>*(Where does your number come from?)* | Tolerances (`pytest.approx` or defined error bounds) are derived from measured floating-point variation and deterministic model test fixture outputs. | Using arbitrary large tolerances or ignoring precision boundaries. | Strict tolerances ensure that numeric regressions or unstable feature transformations are detected immediately. |
 | **Repair**<br>*(Did you fix the cause or hide it?)* | Failures are resolved by fixing the underlying code logic or restoring expected model parity rather than suppressing test execution or modifying lockfiles. | Deleting failing tests or regenerating lock files to bypass failures. | Preserves absolute pipeline integrity and ensures code readability and reliability over a 3-month horizon. |
+
+## Cloud Run Continuous Deployment (Lab 6 Final Stage)
+
+### 1. Deployment Architecture
+The CI/CD pipeline extends beyond testing into automated production delivery. Upon a successful merge to `main`, the `deploy` job executes the following steps:
+- **Authentication**: Authenticates securely to Google Cloud using Workload Identity Federation (`WIF_PROVIDER` and `WIF_SERVICE_ACCOUNT`).
+- **Container Deployment**: Deploys the built container image to Google Cloud Run in region `europe-west1` under the service name `mlops-fri2-alna-bike-demand`.
+- **Live Smoke Check**: Executes `check_deploy.py` against the public Cloud Run URL to verify runtime model and code identity.
+
+### 2. Operational Contracts (Gate, Identity, Proof, Undo)
+- **Gate**: Protected by `needs: container` and a `main` branch push constraint.
+- **Identity**: Keyless OIDC token exchange via WIF (`id-token: write`).
+- **Proof**: Automated assertion matching the live service's `git_sha` and `model_version` against the build commit.
+- **Undo**: Immediate traffic redirection via Cloud Run revision management or clean `git revert` on `main`.
