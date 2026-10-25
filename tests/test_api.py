@@ -150,8 +150,8 @@ def test_predict_reports_loaded_model_version(loaded_model_case):
 
     assert response.status_code == 200
     assert response.json()["model_version"] == version
-
-
+    
+@pytest.mark.regression
 def test_prediction_matches_saved_model(loaded_model_case):
     import math
 
