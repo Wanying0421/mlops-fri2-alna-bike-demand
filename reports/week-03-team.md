@@ -36,3 +36,19 @@ Fast-Fail Architecture: Enforced explicit 503 service status returns during mode
 ### 5.Blockers / Missing Evidence
 Status: All blockers resolved. Container builds, local endpoint tests, and automated integration checks successfully passed without errors.
 
+## MLOps Lab 6: Team Summary Report
+
+### 1. Team Lab 6 Workflow & Division of Labor 
+* **Member 1 (CI Pipeline)**: Configured `.github/workflows/ci.yml` with strict least-privilege permissions, locked installs (`--locked`), Ruff formatting/linting, and preflight checks.
+* **Member 2 (Regression & Markers)**: Developed regression tests in `tests/`, registered strict pytest markers (`--strict-markers`), and defined measurement tolerances.
+* **Reviewer (Defect Drill)**: Injected a synthetic defect into a PR, captured the failing CI logs (Red run), and committed a repair to bring the pipeline back to Green.
+* **Leader (Cloud Run & Release)**: Configured the main-branch-gated Cloud Run continuous deployment workflow utilizing OIDC keyless authentication (`id-token`), verified the live URL, and pushed the annotated `m3` tag.
+
+### 2. Lab 6 Key Deliverables & Evidence 
+* **CI Checks & Container Build**: Automated checks and container smoke tests running successfully on clean runners[cite: 6].
+* **Red-to-Green Defect Recovery**: Verified that synthetic defect injections are properly intercepted by CI and resolved via code repair.
+* **Cloud Run Delivery & Identity**: Successfully deployed to Cloud Run using keyless authentication with live URL identity verification.
+* **Milestone Tag**: Created and pushed the annotated `m3` tag to the official repository.
+
+### 3. Visual Evidence / Screenshots
+
