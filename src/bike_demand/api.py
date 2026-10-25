@@ -33,7 +33,7 @@ class BikePredictionRequest(BaseModel):
     mnth: int = Field(..., ge=1, le=12)
     holiday: int = Field(..., ge=0, le=1)
     yr: int = Field(..., ge=0, le=1)
-    hr: int = Field(..., ge=0, le=23)
+    hr: int = Field(..., ge=0, le=99)
     weekday: int = Field(..., ge=0, le=6)
     workingday: int = Field(..., ge=0, le=1)
     weathersit: int = Field(..., ge=1, le=4)
