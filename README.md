@@ -327,7 +327,7 @@ Part 2: Tests, Defects & Tolerance Questions
 | **Tolerance**<br>*(Where does your number come from?)* | Tolerances (`pytest.approx` or defined error bounds) are derived from measured floating-point variation and deterministic model test fixture outputs. | Using arbitrary large tolerances or ignoring precision boundaries. | Strict tolerances ensure that numeric regressions or unstable feature transformations are detected immediately. |
 | **Repair**<br>*(Did you fix the cause or hide it?)* | Failures are resolved by fixing the underlying code logic or restoring expected model parity rather than suppressing test execution or modifying lockfiles. | Deleting failing tests or regenerating lock files to bypass failures. | Preserves absolute pipeline integrity and ensures code readability and reliability over a 3-month horizon. |
 
-## Cloud Run Continuous Deployment (Lab 6 Final Stage)
+## Cloud Run Continuous Deployment
 
 ### 1. Deployment Architecture
 The CI/CD pipeline extends beyond testing into automated production delivery. Upon a successful merge to `main`, the `deploy` job executes the following steps:
