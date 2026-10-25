@@ -305,3 +305,24 @@ Workflow references:
 [uv in GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/),
 [checkout v6.1.0](https://github.com/actions/checkout/releases/tag/v6.1.0),
 [upload-artifact v7.0.2](https://github.com/actions/upload-artifact/releases/tag/v7.0.2).
+
+### CI, Tests & Operations Decisions
+
+Part 1: Pipeline Checks & Coverage Questions
+
+| Question | Choice | Rejected Option | Reason |
+| :--- | :--- | :--- | :--- |
+| **Coverage**<br>*(What do your checks not cover yet?)* | Run the complete existing test suite and a container smoke check with a synthetic model, reporting this scope explicitly. | Claiming that a passing API fixture check certifies the approved production model or Cloud Run deployment. | A fixture demonstrates service behavior, not the real model's accuracy or a live cloud revision. |
+| **Machine**<br>*(What does a clean runner not have?)* | Obtain dependencies through a locked install and create the clearly labeled smoke fixture directly on the runner. | Depending on a teammate's local `.venv`, ignored model files, or local MLflow databases. | Only committed files are checked out; laptop artifacts do not constitute runner-produced evidence. |
+| **Trigger**<br>*(Which changes start checks?)* | Check every pull request, pushes to the team's integration branch (`main`), and manual dispatch with no path filters. | Checking only pushes after a merge or omitting tests for documentation changes. | PRs receive feedback before integration, the merged revision is verified, and README/workflow changes can impact reproducibility. |
+| **Order**<br>*(Which check should fail first, and why?)* | Locked install, style checks (`ruff`), preflight, all unit/integration tests, and then the dependent Container job. | Building containers before finding basic style or test failures. | Cheap failures stop work early, and `needs: checks` prevents expensive container jobs from starting when code checks fail. |
+| **Evidence**<br>*(What can CI claim about the model?)* | Identify the checked commit, built image ID, and smoke model version, retaining runner-produced output. | Citing a laptop training run or production metadata as proof that CI evaluated it. | CI can only claim the installation, tests, builds, and HTTP checks it performed independently on its own inputs. |
+
+Part 2: Tests, Defects & Tolerance Questions
+
+| Question | Choice | Rejected Option | Reason |
+| :--- | :--- | :--- | :--- |
+| **Defects**<br>*(Which bug does each test catch?)* | The regression test (`test_prediction_matches_saved_model` tagged with `@pytest.mark.regression`) catches unintended numeric drift, feature mismatch bugs, or code regressions that alter prediction outputs away from established baseline expectations. | Relying solely on basic syntax linting to catch runtime prediction errors. | Syntax checks do not verify numerical stability or output correctness over time. |
+| **Failing / Records**<br>*(Can you make each test fail?)* | Yes, modifying the expected baseline output or altering input feature behavior forces an immediate failure, satisfying the red-to-green defect verification rule. | Passing tests by loosening assertions when code outputs change unexpectedly. | Muting or loosening assertions hides regressions instead of catching real defects. |
+| **Tolerance**<br>*(Where does your number come from?)* | Tolerances (`pytest.approx` or defined error bounds) are derived from measured floating-point variation and deterministic model test fixture outputs. | Using arbitrary large tolerances or ignoring precision boundaries. | Strict tolerances ensure that numeric regressions or unstable feature transformations are detected immediately. |
+| **Repair**<br>*(Did you fix the cause or hide it?)* | Failures are resolved by fixing the underlying code logic or restoring expected model parity rather than suppressing test execution or modifying lockfiles. | Deleting failing tests or regenerating lock files to bypass failures. | Preserves absolute pipeline integrity and ensures code readability and reliability over a 3-month horizon. |
