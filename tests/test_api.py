@@ -166,3 +166,22 @@ def test_prediction_matches_saved_model(loaded_model_case):
     assert math.isfinite(prediction)
     assert prediction >= 0
     assert prediction == pytest.approx(expected)
+
+
+def test_predict_rejects_invalid_hour(client_without_model):
+    bad_data = {
+        "season": 1,
+        "yr": 0,
+        "mnth": 1,
+        "hr": 24,
+        "holiday": 0,
+        "weekday": 0,
+        "workingday": 0,
+        "weathersit": 1,
+        "temp": 0.5,
+        "atemp": 0.5,
+        "hum": 0.5,
+        "windspeed": 0.5,
+    }
+    response = client_without_model.post("/predict", json=bad_data)
+    assert response.status_code == 422
