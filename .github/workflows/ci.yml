@@ -177,7 +177,19 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+      - name: Install the pinned uv version and Python
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        with:
+          version: "0.12.23"
+          python-version: "3.12"
 
+      - name: Install from the existing lock file
+        run: uv sync --locked
+
+      - name: Create the model fixture for the image
+        run: |
+          uv run --locked python ci/create_smoke_model.py \
+            --output-dir artifacts --git-sha "$GITHUB_SHA"
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
