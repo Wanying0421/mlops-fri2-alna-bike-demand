@@ -202,6 +202,7 @@ jobs:
           service: mlops-fri2-alna-bike-demand
           region: europe-west1
           source: .
+          flags: --port=8000
 
       - name: Verify Live Deployment
         run: |
