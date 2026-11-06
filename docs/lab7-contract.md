@@ -86,6 +86,39 @@ Ignored laptop artifacts and local MLflow databases are not durable evidence.
 
 ## Evaluation and decision interfaces to implement
 
+### Shared reader added after review
+
+`bike_demand.bundles.verify_candidate_bundle(candidate_dir,
+expected_bundle_sha256=None)` checks an already saved schema-1 candidate. It
+requires the seven expected artifact names, a complete manifest, matching sizes
+and SHA-256 digests, valid JSON and consistent model/data/source/partition
+metadata. It rejects missing/extra files, traversal names and symlink files.
+It returns `manifest`, `metadata` and the exact `bundle_sha256`, without loading
+the model or changing candidate/accepted state. Invalid inputs raise an error.
+
+Consumers should use `bike_demand.bundles.load_verified_model(...)` for trusted
+candidate bundles. It runs verification, checks the model bytes again and loads
+the verified in-memory copy. Its return value is `(model, verification)`.
+Supply `expected_bundle_sha256` from an independently recorded immutable version
+or trusted receipt when binding to an exact candidate. Self-consistent local
+hashes alone do not authenticate a bundle or establish eligibility. Verification
+of external CSV bytes, reference compatibility, measurements and policy remains
+with evaluation/gating; this helper does not produce a gate outcome.
+
+The `verify` CLI below audits a selected local bundle and returns exit 1 for a
+corrupt manifest/file. It does not repair the manifest or recalculate approval:
+
+```powershell
+uv run --locked python -m bike_demand.pipeline verify --candidate-dir $lab7Candidate.FullName
+```
+
+The optional CLI argument `--expected-bundle-sha256` pins the manifest digest.
+Pytest creates isolated synthetic bundles and checks corruption cases; it does
+not scan arbitrary ignored laptop artifacts. A passing suite and verification
+of a selected real candidate are separate pieces of evidence. Members 2–3 must
+wire this reader into their consumer before loading, recording invalid required
+evidence as blocked through their gate logic. Their integration is still pending.
+
 Suggested public Python functions, to agree in the respective PRs:
 
 ```python

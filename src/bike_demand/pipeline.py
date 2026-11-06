@@ -16,6 +16,7 @@ import joblib
 import yaml
 from sklearn.ensemble import RandomForestRegressor
 
+from bike_demand.bundles import verify_candidate_bundle
 from bike_demand.preflight import check_snapshot, sha256
 from bike_demand.split import partition_summary, split_data
 from bike_demand.validate import FEATURES, load_data
@@ -212,14 +213,30 @@ def train_candidate(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("check", "train"))
+    parser.add_argument("stage", choices=("check", "train", "verify"))
     parser.add_argument("--config", type=Path, default=Path("configs/baseline.yaml"))
     parser.add_argument("--candidate-id", help="Optional write-once candidate-... ID")
+    parser.add_argument("--candidate-dir", type=Path, help="Completed bundle to verify")
+    parser.add_argument(
+        "--expected-bundle-sha256", help="Previously recorded manifest digest"
+    )
     args = parser.parse_args()
     try:
         if args.stage == "check":
             _, _, summaries = inspect_inputs(Path.cwd(), args.config)
             result = {"status": "inputs_validated", "partitions": summaries}
+        elif args.stage == "verify":
+            if args.candidate_dir is None:
+                raise ValueError("verify: require --candidate-dir")
+            verification = verify_candidate_bundle(
+                args.candidate_dir, args.expected_bundle_sha256
+            )
+            result = {
+                "status": "bundle_verified",
+                "candidate_id": verification["manifest"]["candidate_id"],
+                "bundle_sha256": verification["bundle_sha256"],
+                "evaluation_status": "not_evaluated",
+            }
         else:
             path = train_candidate(Path.cwd(), args.config, args.candidate_id)
             result = {

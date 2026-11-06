@@ -366,6 +366,27 @@ MLflow database or legacy metrics file is changed. Exit 0 means **trained**, wit
 The original `bike_demand.train` remains for baseline compatibility and must not
 be used as the Lab 7 candidate entry point because it overwrites fixed artifacts.
 
+### Verify a saved candidate before loading
+
+The review identified missing consumer-side checks for a saved bundle. The
+shared reader in `bike_demand.bundles` now verifies the manifest schema, exact
+file names, byte counts, SHA-256 values and metadata cross-references before
+model loading. `load_verified_model` loads the checked bytes from memory.
+The evaluator owner must use this reader in the forthcoming consumer.
+
+To audit the local candidate selected in PowerShell:
+
+```powershell
+uv run --locked python -m bike_demand.pipeline verify --candidate-dir $lab7Candidate.FullName
+```
+
+Use `--expected-bundle-sha256` to bind verification to a manifest digest recorded
+independently in trusted evidence or immutable storage. Success reports
+`bundle_verified` and `not_evaluated`; it does not establish policy eligibility.
+An invalid selected bundle exits 1 with a reason and remains unchanged.
+Pytest checks corrupted synthetic bundles, including the reviewer's changed
+manifest-digest case. It does not automatically inspect ignored local artifacts.
+
 ### Pipeline design decisions
 
 | Question | Choice | Alternative | Reason |

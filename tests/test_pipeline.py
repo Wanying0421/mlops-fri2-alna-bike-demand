@@ -9,7 +9,7 @@ import joblib
 import pytest
 import yaml
 
-from bike_demand import pipeline
+from bike_demand import bundles, pipeline
 from bike_demand.preflight import sha256
 from bike_demand.validate import FEATURES, load_data
 
@@ -191,3 +191,205 @@ def test_path_traversal_cannot_target_the_accepted_model(checkout):
         pipeline.train_candidate(
             checkout, checkout / "configs/baseline.yaml", "../model"
         )
+
+
+@pytest.fixture
+def candidate(checkout):
+    return pipeline.train_candidate(
+        checkout, checkout / "configs/baseline.yaml", "candidate-review-fixture"
+    )
+
+
+def test_verified_bundle_loads_the_original_trusted_model(candidate):
+    before = {path.name: path.read_bytes() for path in candidate.iterdir()}
+    expected = sha256(candidate / "bundle.json")
+    model, verification = bundles.load_verified_model(candidate, expected.upper())
+    assert list(model.feature_names_in_) == list(FEATURES)
+    assert verification["bundle_sha256"] == expected
+    assert verification["metadata"]["training_rows"] == 2
+    assert before == {path.name: path.read_bytes() for path in candidate.iterdir()}
+
+
+@pytest.mark.parametrize("name", sorted(bundles.BUNDLE_FILES))
+def test_changed_bundle_file_is_rejected_before_deserialization(
+    candidate, monkeypatch, name
+):
+    path = candidate / name
+    original = path.read_bytes()
+    # Keep the same length so a digest mismatch cannot be hidden by a size check.
+    path.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+    before = {path.name: path.read_bytes() for path in candidate.iterdir()}
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Corrupted bundles must never reach joblib.load")
+
+    monkeypatch.setattr(bundles.joblib, "load", forbidden)
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        bundles.load_verified_model(candidate)
+    assert before == {path.name: path.read_bytes() for path in candidate.iterdir()}
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "digest",
+        "size",
+        "negative_size",
+        "boolean_size",
+        "invalid_digest",
+        "schema",
+        "boolean_schema",
+        "missing_entry",
+        "traversal",
+        "absolute_path",
+        "wrong_stage",
+        "wrong_status",
+        "missing_manifest",
+        "invalid_json",
+        "duplicate_key",
+        "nonfinite",
+    ],
+)
+def test_corrupted_manifest_is_rejected_before_loading(candidate, monkeypatch, fault):
+    path = candidate / "bundle.json"
+    manifest = json.loads(path.read_bytes())
+    entry = manifest["files"]["model.joblib"]
+    if fault == "digest":
+        entry["sha256"] = "0" * 64
+    elif fault == "size":
+        entry["bytes"] += 1
+    elif fault == "negative_size":
+        entry["bytes"] = -1
+    elif fault == "boolean_size":
+        entry["bytes"] = True
+    elif fault == "invalid_digest":
+        entry["sha256"] = "not-a-sha256"
+    elif fault == "schema":
+        manifest["schema_version"] = 999
+    elif fault == "boolean_schema":
+        manifest["schema_version"] = True
+    elif fault == "missing_entry":
+        del manifest["files"]["model.joblib"]
+    elif fault == "traversal":
+        manifest["files"]["../model.joblib"] = manifest["files"].pop("model.joblib")
+    elif fault == "absolute_path":
+        manifest["files"]["/model.joblib"] = manifest["files"].pop("model.joblib")
+    elif fault == "wrong_stage":
+        manifest["stage"] = "training"
+    elif fault == "wrong_status":
+        manifest["evaluation_status"] = "eligible"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    if fault == "missing_manifest":
+        path.unlink()
+    elif fault == "invalid_json":
+        path.write_text("{incomplete", encoding="utf-8")
+    elif fault == "duplicate_key":
+        path.write_text('{"schema_version": 1, "schema_version": 1}', encoding="utf-8")
+    elif fault == "nonfinite":
+        path.write_text('{"schema_version": NaN}', encoding="utf-8")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Invalid manifests must never reach joblib.load")
+
+    monkeypatch.setattr(bundles.joblib, "load", forbidden)
+    with pytest.raises(ValueError):
+        bundles.load_verified_model(candidate)
+
+
+def test_recorded_manifest_digest_binds_the_exact_manifest(candidate):
+    expected = sha256(candidate / "bundle.json")
+    with (candidate / "bundle.json").open("ab") as stream:
+        stream.write(b"\n")  # Valid JSON; a pinned byte identity must still fail.
+    with pytest.raises(ValueError, match="trusted bundle.json SHA-256 mismatch"):
+        bundles.verify_candidate_bundle(candidate, expected)
+
+
+@pytest.mark.parametrize("name", ["model.joblib", "model-metadata.json"])
+def test_missing_required_file_is_rejected(candidate, name):
+    (candidate / name).unlink()
+    with pytest.raises(ValueError, match="missing or unexpected files"):
+        bundles.verify_candidate_bundle(candidate)
+
+
+def test_loader_uses_the_verified_memory_copy(candidate, monkeypatch):
+    original_load = bundles.joblib.load
+    original_model_hash = sha256(candidate / "model.joblib")
+
+    def replace_path_before_deserialization(stream):
+        assert hasattr(stream, "read")  # The loader must not reopen a mutable path.
+        (candidate / "model.joblib").write_bytes(b"synthetic replacement after read")
+        return original_load(stream)
+
+    monkeypatch.setattr(bundles.joblib, "load", replace_path_before_deserialization)
+    model, verified = bundles.load_verified_model(candidate)
+    assert list(model.feature_names_in_) == list(FEATURES)
+    assert verified["metadata"]["model_sha256"] == original_model_hash
+    assert sha256(candidate / "model.joblib") != original_model_hash
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("model_version", "candidate-other"),
+        ("model_sha256", "0" * 64),
+        ("data_sha256", "0" * 64),
+        ("features", list(reversed(FEATURES))),
+        ("training_rows", 999),
+        ("random_seed", None),
+        ("training_commit", "unavailable"),
+    ],
+)
+def test_metadata_cross_references_are_checked(candidate, field, value):
+    path = candidate / "model-metadata.json"
+    meta = json.loads(path.read_bytes())
+    meta[field] = value
+    path.write_text(json.dumps(meta), encoding="utf-8")
+    manifest_path = candidate / "bundle.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    # Simulate a self-consistent checksum update: semantic cross-references still fail.
+    manifest["files"][path.name] = {
+        "sha256": sha256(path),
+        "bytes": path.stat().st_size,
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError):
+        bundles.verify_candidate_bundle(candidate)
+
+
+def test_model_replacement_after_verification_is_rejected(candidate, monkeypatch):
+    original_verify = bundles.verify_candidate_bundle
+
+    def replace_after_verify(*args):
+        result = original_verify(*args)
+        with (candidate / "model.joblib").open("ab") as stream:
+            stream.write(b"changed after verification")
+        return result
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Replaced model bytes must never reach joblib.load")
+
+    monkeypatch.setattr(bundles, "verify_candidate_bundle", replace_after_verify)
+    monkeypatch.setattr(bundles.joblib, "load", forbidden)
+    with pytest.raises(ValueError, match="mismatch"):
+        bundles.load_verified_model(candidate)
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_verify_cli_reports_the_selected_bundle(
+    candidate, monkeypatch, capsys, corrupt
+):
+    if corrupt:
+        manifest_path = candidate / "bundle.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest["files"]["model.joblib"]["sha256"] = "0" * 64
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv", ["pipeline", "verify", "--candidate-dir", str(candidate)]
+    )
+    assert pipeline.main() == (1 if corrupt else 0)
+    output = capsys.readouterr()
+    if corrupt:
+        assert "SHA-256 mismatch for model.joblib" in output.err
+        assert output.out == ""
+    else:
+        assert json.loads(output.out)["status"] == "bundle_verified"
