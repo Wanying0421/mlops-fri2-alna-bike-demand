@@ -4,3 +4,7 @@
 data/raw/hour.csv -text
 data/UCI-original-Readme.txt -text
 tests/fixtures/*.csv -text
+
+# Retain the exact bytes of locally captured Lab 7 evidence.
+evidence/lab7/member1/*.txt -text
+evidence/lab7/member1/*.json -text
