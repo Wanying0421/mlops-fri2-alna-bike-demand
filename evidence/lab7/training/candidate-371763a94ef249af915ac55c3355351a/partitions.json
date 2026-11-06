@@ -1,0 +1,20 @@
+{
+  "test": {
+    "date_max": "2012-12-31",
+    "date_min": "2012-07-01",
+    "ordered_ids_sha256": "2ce5f2194f3b644ffb38247cdd8a5484d812400a54d59848a3bce13c5413bade",
+    "rows": 4376
+  },
+  "train": {
+    "date_max": "2011-12-31",
+    "date_min": "2011-01-01",
+    "ordered_ids_sha256": "91e3be508c5d40c3fe2c3a803a1bdde706053f08193be9fd6b995348435c488e",
+    "rows": 8645
+  },
+  "validation": {
+    "date_max": "2012-06-30",
+    "date_min": "2012-01-01",
+    "ordered_ids_sha256": "b11b3106845f510f23028af1c35af181df6b8cdd46d1faccf5a52c07a0b32a9f",
+    "rows": 4358
+  }
+}
