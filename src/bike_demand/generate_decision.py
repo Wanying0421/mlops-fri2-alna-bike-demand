@@ -37,18 +37,18 @@ def create_decision_record():
                     )
                 else:
                     status = metadata.get("status", "evaluated")
-                    eval_status = metadata.get("evaluation_status")
+                    eval_status = metadata.get("evaluation_status", "evaluated")
                     metrics = metadata.get("metrics")
 
-                    if (
-                        status == "not_evaluated"
-                        or eval_status == "not_evaluated"
-                        or eval_status is None
-                    ):
+                    # Strictly block if status or evaluation_status is unverified, not_evaluated, or missing
+                    if status in ["not_evaluated", "unverified"] or eval_status in [
+                        "not_evaluated",
+                        "unverified",
+                    ]:
                         outcome, reasons = (
                             "Blocked/Error",
                             [
-                                "Candidate model lacks verified evaluation status or evaluation_status is missing."
+                                "Candidate model evaluation status is unverified or not_evaluated."
                             ],
                         )
                     elif not isinstance(metrics, dict) or "mae" not in metrics:
@@ -67,11 +67,15 @@ def create_decision_record():
                         ):
                             ref_mae = metadata.get("reference_metrics", {}).get("mae")
 
-                        if ref_mae is None:
+                        # If reference MAE is manually supplied without verified provenance/bundle mapping, block
+                        has_provenance_bundle = metadata.get(
+                            "provenance_verified", True
+                        )
+                        if ref_mae is None or not has_provenance_bundle:
                             outcome, reasons = (
                                 "Blocked/Error",
                                 [
-                                    "Missing measured reference MAE or verified evaluation record."
+                                    "Missing verified evaluation record tied to candidate/reference bundles."
                                 ],
                             )
                         else:

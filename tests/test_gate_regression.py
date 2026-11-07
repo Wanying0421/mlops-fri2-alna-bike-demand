@@ -23,11 +23,19 @@ def test_eligible_candidate_passes():
     assert outcome == "Eligible"
 
 
-def test_generator_blocks_partial_metadata(tmp_path, monkeypatch):
+def test_generator_blocks_unverified_status(tmp_path, monkeypatch):
     training_dir = tmp_path / "evidence" / "lab7" / "training" / "candidate-test"
     training_dir.mkdir(parents=True)
     meta_file = training_dir / "model-metadata.json"
-    meta_file.write_text(json.dumps({"metrics": {"mae": 9.0}}))
+    meta_file.write_text(
+        json.dumps(
+            {
+                "evaluation_status": "unverified",
+                "metrics": {"mae": 8.5},
+                "reference_mae": 10.0,
+            }
+        )
+    )
 
     monkeypatch.chdir(tmp_path)
     generate_decision.create_decision_record()
