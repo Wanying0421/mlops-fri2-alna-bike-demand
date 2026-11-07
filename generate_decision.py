@@ -1,56 +1,56 @@
+import hashlib
 import json
-import subprocess
 from pathlib import Path
 
 from bike_demand.gate import evaluate_quality_gate
 
 
-def get_git_commit_hash():
-    try:
-        return (
-            subprocess.check_output(["git", "rev-parse", "HEAD"])
-            .strip()
-            .decode("utf-8")
-        )
-    except Exception:
-        return "unknown"
+def get_policy_version():
+    policy_path = Path("src/bike_demand/gate.py")
+    if policy_path.exists():
+        content = policy_path.read_bytes()
+        return hashlib.sha256(content).hexdigest()[:12]
+    return "unknown"
 
 
 def create_decision_record():
-    # Look for training evidence bundles generated in Lab 7
     training_dir = Path("evidence/lab7/training")
     bundles = list(training_dir.glob("candidate-*")) if training_dir.exists() else []
 
-    candidate_metrics = {"mae": 9.2}
-    incumbent_metrics = {"mae": 10.0}
-    candidate_id = "bike-demand-candidate-dynamic"
-    incumbent_id = "bike-demand-incumbent-baseline"
-    provenance_valid = True
+    metadata_exists = False
+    metadata = {}
 
-    if bundles:
-        # Pick the latest candidate bundle
+    if not bundles:
+        outcome, reasons = evaluate_quality_gate({}, {}, provenance_valid=False)
+    else:
         latest_bundle = sorted(bundles)[-1]
         metadata_path = latest_bundle / "model-metadata.json"
-        if metadata_path.exists():
+        if not metadata_path.exists():
+            outcome, reasons = evaluate_quality_gate({}, {}, provenance_valid=False)
+        else:
+            metadata_exists = True
             with open(metadata_path, "r") as f:
                 metadata = json.load(f)
-                candidate_id = metadata.get("model_id", candidate_id)
-                candidate_metrics["mae"] = metadata.get("metrics", {}).get(
-                    "mae", candidate_metrics["mae"]
+
+            status = metadata.get("status", "evaluated")
+            if status == "not_evaluated":
+                outcome, reasons = (
+                    "Blocked/Error",
+                    ["Candidate model status is not_evaluated."],
+                )
+            else:
+                candidate_metrics = {"mae": metadata.get("metrics", {}).get("mae")}
+                incumbent_metrics = {"mae": 10.0}
+                outcome, reasons = evaluate_quality_gate(
+                    candidate_metrics, incumbent_metrics, provenance_valid=True
                 )
 
-    outcome, reasons = evaluate_quality_gate(
-        candidate_metrics, incumbent_metrics, provenance_valid=provenance_valid
-    )
-
     record = {
-        "policy_version": get_git_commit_hash(),
-        "candidate_identity": candidate_id,
-        "incumbent_identity": incumbent_id,
-        "measurements": {
-            "candidate_mae": candidate_metrics["mae"],
-            "incumbent_mae": incumbent_metrics["mae"],
-        },
+        "policy_version": get_policy_version(),
+        "candidate_identity": metadata.get("model_id", "missing")
+        if metadata_exists
+        else "missing",
+        "incumbent_identity": "bike-demand-incumbent-baseline",
         "outcome": outcome,
         "reasons": reasons,
     }
@@ -58,7 +58,7 @@ def create_decision_record():
     Path("evidence").mkdir(exist_ok=True)
     with open("evidence/decision_record.json", "w") as f:
         json.dump(record, f, indent=2)
-    print(f"Dynamic decision record generated successfully from bundles: {outcome}")
+    print(f"Decision record generated: {outcome}")
 
 
 if __name__ == "__main__":
