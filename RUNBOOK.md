@@ -6,9 +6,9 @@
 - **Scope:** Affects Cloud Run traffic routed to the current active revision.
 
 ## 2. First Checks
-1. Check Cloud Run service health.
+1. Check Cloud Run service health (GET /health -> 200/503).
 2. Inspect recent Cloud Run logs for exceptions or model loading errors.
-3. Verify active revision identity and model checksum.
+3. Verify active revision identity and model checksum against the retained accepted release record.
 
 ## 3. Safe Rollback Targets & Procedure
 - **Target:** Exact retained compatible Cloud Run revision and verified model bundle.
@@ -21,4 +21,4 @@
 
 ## 5. Escalation & Last Verified Context
 - **Last Verified Context:** Lab 8 Incident Response Drill.
-- **Escalator / Owner:** Team Lead (Member 1) & Operator (Member 3).
+- **Escalator / Owner:** Team Lead (Member 1).

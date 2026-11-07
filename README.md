@@ -447,3 +447,8 @@ Then rebuild the Docker image.
 - **Live Service Verification:** Validated health and prediction endpoint contracts.
 - **Baseline Measurement:** Recorded pre-incident reference traffic and p95 latency on Cloud Run.
 - **Runbook Framework:** Published initial RUNBOOK.md at repo root.
+
+## 1. Member 1 (Lead — Infrastructure, Baseline & Runbook Lead)
+- **Live Service Verification:** Validated health and prediction endpoint contracts.
+- **Baseline Measurement:** Recorded pre-incident reference traffic, latency, and error metrics on Cloud Run.
+- **Runbook Framework:** Published initial RUNBOOK.md at repo root for operational guidance.
