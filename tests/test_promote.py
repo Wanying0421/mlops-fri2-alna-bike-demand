@@ -1,3 +1,5 @@
+"""Tests for the model promotion script."""
+
 import hashlib
 import json
 from pathlib import Path
@@ -42,7 +44,7 @@ def setup_dirs(tmp_path, monkeypatch):
     }
     (candidate_dir / "decision_record.json").write_text(json.dumps(decision))
 
-    # Simulate an existing accepted and previous version
+    # Simulate existing accepted and previous versions
     (models_dir / "version-old").mkdir()
     (models_dir / "version-old" / "model.joblib").write_text("OLD_MODEL")
     (models_dir / "version-old" / "model-metadata.json").write_text(
@@ -74,15 +76,41 @@ def test_manifest_rejects_invalid_candidate_id(setup_dirs):
     assert (models_dir / "current_version.txt").read_text() == "version-old"
 
 
+def test_metadata_tampering_rejected(setup_dirs):
+    """Modifying metadata after the bundle must fail because the digest no longer matches."""
+    candidate_dir, models_dir = setup_dirs
+    (candidate_dir / "model-metadata.json").write_text(
+        json.dumps({"model_version": "HACKED"})
+    )
+
+    result = promote.main()
+    assert result == 1
+    assert (models_dir / "current_version.txt").read_text() == "version-old"
+
+
+def test_interrupted_staging_copy_leaves_state_unchanged(setup_dirs, monkeypatch):
+    """A copy failure during staging must leave both references untouched."""
+    candidate_dir, models_dir = setup_dirs
+
+    def mock_copy(*args, **kwargs):
+        raise OSError("Simulated copy failure")
+
+    monkeypatch.setattr(promote.shutil, "copy2", mock_copy)
+
+    result = promote.main()
+    assert result == 1
+    assert (models_dir / "current_version.txt").read_text() == "version-old"
+    assert (models_dir / "previous_version.txt").read_text() == "version-older"
+
+
 def test_pointer_switch_failure_leaves_previous_intact(setup_dirs, monkeypatch):
-    """A crash during the pointer update must leave both references unchanged."""
+    """A crash on the current pointer move must leave both references intact."""
     candidate_dir, models_dir = setup_dirs
 
     original_move = promote.shutil.move
 
     def mock_move(src, dst):
-        # Fail only on the final pointer update
-        if "current.txt" in str(src) or "previous.txt" in str(src):
+        if "current.txt" in str(src):
             raise OSError("Simulated pointer crash")
         return original_move(src, dst)
 

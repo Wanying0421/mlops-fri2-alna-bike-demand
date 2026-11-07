@@ -45,8 +45,19 @@ class BikePredictionRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    model_path = Path(os.getenv("MODEL_PATH", "artifacts/model.joblib"))
-    metadata_path = Path(os.getenv("METADATA_PATH", "artifacts/model-metadata.json"))
+    """Load the model using the current_version pointer."""
+    models_dir = Path(os.getenv("MODELS_DIR", "models"))
+    current_pointer = models_dir / "current_version.txt"
+
+    if not current_pointer.exists():
+        print("No current_version.txt pointer found. Model will not load.")
+        yield
+        return
+
+    version_dir = current_pointer.read_text().strip()
+    model_dir = models_dir / version_dir
+    model_path = model_dir / "model.joblib"
+    metadata_path = model_dir / "model-metadata.json"
 
     if metadata_path.exists():
         try:
@@ -81,17 +92,14 @@ async def lifespan(app: FastAPI):
     model_store.feature_names = None
 
 
-# Initialize FastAPI app with lifespan
 app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=lifespan)
 
-# Configure basic logging to output single-line JSON
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("bike_demand")
 
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Middleware to log each request's event, status code, duration, and model version, including exceptions."""
     start_time = time.time()
     status_code = 500
     try:
@@ -116,7 +124,6 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint to verify service and model status."""
     if not model_store.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
     git_sha = os.getenv("GIT_SHA", "unknown")
@@ -129,7 +136,6 @@ def health_check():
 
 @app.post("/predict")
 def predict(payload: BikePredictionRequest):
-    """Predict bike demand based on input features with non-negative guard."""
     if not model_store.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
     try:
