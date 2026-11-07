@@ -1,6 +1,7 @@
 import json
 import subprocess
 from pathlib import Path
+
 from bike_demand.gate import evaluate_quality_gate
 
 
