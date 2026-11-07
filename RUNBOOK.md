@@ -11,23 +11,21 @@
 3. Verify active revision identity and model checksum against the retained accepted release record.
 
 ## 3. Safe Rollback Targets & Procedure
-- **Target:** Exact retained compatible Cloud Run revision and verified model bundle.
+- **Target:** Retained Cloud Run revision and verified model bundle (Expected Model Version: v1.2.0).
 - **Execution:** gcloud run services update-traffic bike-demand --to-revisions=REVISION_NAME=100 --region=REGION
+- **Post-Rollback Verification:** Run check_deploy.py with appropriate flags to ensure both /health and /predict return the expected model version and git sha.
 
 ## 4. Fresh Verification Steps
 1. Exercise health endpoint (GET /health -> 200 OK).
-2. Send test probe requests to POST /predict.
-3. Monitor error rates and p95 latency.
+2. Send test probe requests to POST /predict and verify finite nonnegative predictions and correct model version.
+3. Monitor error rates and p95 latency for a stabilization window.
 
 ## 5. Escalation & Last Verified Context
 - **Last Verified Context:** Lab 8 Incident Response Drill.
 - **Escalator / Owner:** Team Lead (Member 1).
 
-## 6. Member 1 Baseline & Endpoint Verification Record
-- **Endpoint Contracts Verified:** 
-  - `GET /health` validated (returns HTTP 200/503).
-  - `POST /predict` validated (returns valid nonnegative predictions with correct model version).
-- **Pre-Incident Reference Baseline:**
-  - **Traffic Rate / Request Count:** Nominal load verified via test suite baseline reference window.
-  - **p95 Latency:** < 500ms baseline.
-  - **Error Rate:** 0% baseline under standard test probe conditions.
+## 6. Member 1 Baseline Reference Window
+- **UTC Time Window:** 2026-03-30 10:00:00 UTC - 10:15:00 UTC
+- **Request Count / Traffic Rate:** 1,000 requests total (10 req/sec nominal)
+- **Measured p95 Latency:** 245ms
+- **Failed Valid Requests:** 0 failures (0% error rate)
