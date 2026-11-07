@@ -9,11 +9,13 @@ ACCEPTED_DIR = Path("models/accepted")
 PREVIOUS_DIR = Path("models/previous")
 REQUIRED_FILES = ("model.joblib", "model-metadata.json")
 
+
 def _check_candidate() -> None:
     for name in REQUIRED_FILES:
         path = CANDIDATE_DIR / name
         if not path.exists():
             raise FileNotFoundError(f"Candidate file missing: {path}")
+
 
 def _backup_accepted() -> None:
     if not ACCEPTED_DIR.exists() or not any(ACCEPTED_DIR.iterdir()):
@@ -29,14 +31,18 @@ def _backup_accepted() -> None:
             shutil.copy2(src, PREVIOUS_DIR / name)
     print(f"Backed up accepted bundle to {PREVIOUS_DIR}")
 
+
 def _promote_candidate() -> dict:
     ACCEPTED_DIR.mkdir(parents=True, exist_ok=True)
     for name in REQUIRED_FILES:
         shutil.copy2(CANDIDATE_DIR / name, ACCEPTED_DIR / name)
     metadata = json.loads((ACCEPTED_DIR / "model-metadata.json").read_text())
     metadata["promoted_at"] = datetime.now(timezone.utc).isoformat()
-    (ACCEPTED_DIR / "model-metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    (ACCEPTED_DIR / "model-metadata.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8"
+    )
     return metadata
+
 
 def main() -> int:
     try:
@@ -49,6 +55,7 @@ def main() -> int:
     print("Promotion complete.")
     print(f"Accepted model_version: {metadata.get('model_version')}")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
