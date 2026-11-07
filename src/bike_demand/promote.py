@@ -66,24 +66,30 @@ def _write_versions_atomically(current: str, previous: str | None) -> None:
 
 
 def _atomic_promote(candidate_dir: Path, decision: dict) -> None:
+    """Stage, verify, and switch. Version directories are immutable."""
     model_hash = _sha256(candidate_dir / "model.joblib")[:8]
     new_version_name = f"version-{model_hash}"
     new_version_path = MODELS_DIR / new_version_name
+
+    # If the candidate is already the current version, do not touch the pointers.
+    versions = _read_versions()
+    if versions.get("current") == new_version_name:
+        print("Candidate is already the current version. No changes made.")
+        return
 
     with tempfile.TemporaryDirectory(dir=MODELS_DIR) as temp_dir:
         staging = Path(temp_dir)
         for name in BUNDLE_FILES:
             shutil.copy2(candidate_dir / name, staging / name)
-        shutil.copy2(candidate_dir / "bundle.json", staging / "bundle.json")
+        if (candidate_dir / "bundle.json").exists():
+            shutil.copy2(candidate_dir / "bundle.json", staging / "bundle.json")
 
-        # Re-verify the staged bundle
         verify_candidate_bundle(staging, decision["bundle_sha256"])
 
         if new_version_path.exists():
             shutil.rmtree(new_version_path)
         shutil.move(str(staging), str(new_version_path))
 
-    versions = _read_versions()
     current_version = versions.get("current")
     _write_versions_atomically(current=new_version_name, previous=current_version)
 

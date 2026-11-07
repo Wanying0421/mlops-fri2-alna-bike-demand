@@ -109,3 +109,27 @@ def test_pointer_switch_failure_leaves_both_references_intact(valid_setup, monke
     versions = json.loads((models_dir / "versions.json").read_text())
     assert versions["current"] == "version-old"
     assert versions["previous"] == "version-older"
+
+
+def test_repromoting_active_model_leaves_references_unchanged(valid_setup):
+    """Promoting the active model again must not overwrite `previous`."""
+    candidate_dir, models_dir = valid_setup
+
+    # 1. Promote A (the fixture's candidate)
+    result_a = promote.main()
+    assert result_a == 0
+    versions_a = json.loads((models_dir / "versions.json").read_text())
+    current_a = versions_a["current"]
+    previous_a = versions_a["previous"]
+
+    # 2. Promote B (same fixture -> same bundle, same version name)
+    result_b = promote.main()
+    assert result_b == 0
+
+    # 3. Re-promoting the active model must leave both references unchanged
+    result_c = promote.main()
+    assert result_c == 0
+    versions_c = json.loads((models_dir / "versions.json").read_text())
+
+    assert versions_c["current"] == current_a
+    assert versions_c["previous"] == previous_a
