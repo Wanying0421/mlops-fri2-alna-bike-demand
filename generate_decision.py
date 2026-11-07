@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
+
 from bike_demand.gate import evaluate_quality_gate
+
 
 def create_decision_record():
     candidate_metrics = {"mae": 9.2}
