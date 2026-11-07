@@ -45,21 +45,35 @@ class BikePredictionRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model using the current_version pointer."""
+    """Load the model using either the pointer or direct paths."""
     models_dir = Path(os.getenv("MODELS_DIR", "models"))
     current_pointer = models_dir / "current_version.txt"
 
-    if not current_pointer.exists():
-        print("No current_version.txt pointer found. Model will not load.")
+    # Fallback to explicit paths for tests and backwards compatibility
+    explicit_model_path = os.getenv("MODEL_PATH")
+    explicit_metadata_path = os.getenv("METADATA_PATH")
+
+    model_path = None
+    metadata_path = None
+
+    if explicit_model_path and explicit_metadata_path:
+        # Old behavior (used by tests)
+        model_path = Path(explicit_model_path)
+        metadata_path = Path(explicit_metadata_path)
+    elif current_pointer.exists():
+        # New behavior (used by promotion)
+        version_dir = current_pointer.read_text().strip()
+        model_dir = models_dir / version_dir
+        model_path = model_dir / "model.joblib"
+        metadata_path = model_dir / "model-metadata.json"
+    else:
+        print(
+            "No MODEL_PATH or current_version.txt pointer found. Model will not load."
+        )
         yield
         return
 
-    version_dir = current_pointer.read_text().strip()
-    model_dir = models_dir / version_dir
-    model_path = model_dir / "model.joblib"
-    metadata_path = model_dir / "model-metadata.json"
-
-    if metadata_path.exists():
+    if metadata_path and metadata_path.exists():
         try:
             with open(metadata_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
@@ -72,7 +86,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Error reading metadata: {e}")
 
-    if model_path.exists():
+    if model_path and model_path.exists():
         try:
             artifact = joblib.load(model_path)
             if isinstance(artifact, dict) and "model" in artifact:
