@@ -5,13 +5,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Directory holding the candidate bundle and its decision record
 CANDIDATE_DIR = Path("artifacts/candidate")
-# Directory holding the currently accepted bundle
-ACCEPTED_DIR = Path("models/accepted")
-# Directory holding the previous accepted bundle (for rollback)
-PREVIOUS_DIR = Path("models/previous")
-# Files that make up a complete model bundle
+MODELS_DIR = Path("models")
+ACCEPTED_POINTER = MODELS_DIR / "accepted_pointer.txt"
 REQUIRED_FILES = ("model.joblib", "model-metadata.json")
 
 
@@ -24,80 +20,96 @@ def _calculate_sha256(path: Path) -> str:
     return sha256.hexdigest()
 
 
-def _check_eligibility(candidate_dir: Path) -> None:
-    """Verify that the candidate is eligible and matches its recorded digest."""
+def _check_eligibility_and_bundle(candidate_dir: Path) -> Path:
+    """Verify eligibility and the complete bundle digest."""
     decision_file = candidate_dir / "decision_record.json"
-    if not decision_file.exists():
-        raise ValueError("Missing decision_record.json")
+    bundle_file = candidate_dir / "bundle.json"
+
+    if not decision_file.exists() or not bundle_file.exists():
+        raise ValueError("Missing decision_record.json or bundle.json")
 
     decision = json.loads(decision_file.read_text())
     if decision.get("outcome") != "Eligible":
         raise ValueError(f"Candidate is not eligible: {decision.get('outcome')}")
 
-    expected_digest = decision.get("candidate_sha256")
+    # On vérifie que le bundle entier correspond au SHA-256 de la décision
+    expected_digest = decision.get("bundle_sha256")
     if not expected_digest:
-        raise ValueError("Decision record missing candidate_sha256")
+        raise ValueError("Decision record missing bundle_sha256")
 
-    model_path = candidate_dir / "model.joblib"
-    if not model_path.exists():
-        raise FileNotFoundError(f"Candidate model missing: {model_path}")
-
-    actual_digest = _calculate_sha256(model_path)
+    actual_digest = _calculate_sha256(bundle_file)
     if actual_digest != expected_digest:
-        raise ValueError("SHA-256 digest mismatch")
+        raise ValueError("Bundle SHA-256 digest mismatch")
+
+    # On vérifie que le bundle.json correspond bien aux fichiers présents
+    bundle = json.loads(bundle_file.read_text())
+    for name, file_digest in bundle.items():
+        path = candidate_dir / name
+        if not path.exists():
+            raise FileNotFoundError(f"Missing file in bundle: {name}")
+        if _calculate_sha256(path) != file_digest:
+            raise ValueError(f"File digest mismatch for {name}")
+
+    return candidate_dir
 
 
-def _backup_accepted() -> None:
-    """Copy the current accepted bundle to the previous directory."""
-    if not ACCEPTED_DIR.exists() or not any(ACCEPTED_DIR.iterdir()):
-        print("No accepted bundle to back up.")
-        return
-    PREVIOUS_DIR.mkdir(parents=True, exist_ok=True)
-    # Clear the previous directory
-    for item in PREVIOUS_DIR.iterdir():
-        if item.is_file():
-            item.unlink()
-    for name in REQUIRED_FILES:
-        src = ACCEPTED_DIR / name
-        if src.exists():
-            shutil.copy2(src, PREVIOUS_DIR / name)
-    print(f"Backed up accepted bundle to {PREVIOUS_DIR}")
+def _get_current_accepted() -> str | None:
+    if ACCEPTED_POINTER.exists():
+        return ACCEPTED_POINTER.read_text().strip()
+    return None
+
+
+def _set_pointer(version_dir_name: str) -> None:
+    # Écriture atomique du pointeur
+    with tempfile.NamedTemporaryFile("w", dir=MODELS_DIR, delete=False) as f:
+        f.write(version_dir_name)
+        temp_path = f.name
+    shutil.move(temp_path, ACCEPTED_POINTER)
 
 
 def _atomic_promote(candidate_dir: Path) -> None:
-    """Stage the candidate fully, then atomically replace the accepted bundle."""
-    # Create a staging directory in the same parent for atomic move
-    with tempfile.TemporaryDirectory(dir="models") as temp_dir:
-        staging = Path(temp_dir)
+    current_version = _get_current_accepted()
+    new_version_name = (
+        f"version-{_calculate_sha256(candidate_dir / 'model.joblib')[:8]}"
+    )
+    new_version_path = MODELS_DIR / new_version_name
 
-        # Copy all required files into staging
+    # 1. Préparer et vérifier dans le staging (on copie dans un dossier version-XXX)
+    with tempfile.TemporaryDirectory(dir=MODELS_DIR) as temp_dir:
+        staging = Path(temp_dir)
         for name in REQUIRED_FILES:
             shutil.copy2(candidate_dir / name, staging / name)
 
-        # Verify that the staging bundle is complete
+        # Vérification
         for name in REQUIRED_FILES:
             if not (staging / name).exists():
                 raise ValueError(f"Staging failed for {name}")
 
-        # Atomic switch: remove old accepted and replace with staging
-        if ACCEPTED_DIR.exists():
-            shutil.rmtree(ACCEPTED_DIR)
-        shutil.move(str(staging), str(ACCEPTED_DIR))
+        # 2. Déplacer le staging vers son dossier final
+        if new_version_path.exists():
+            shutil.rmtree(new_version_path)
+        shutil.move(str(staging), str(new_version_path))
+
+    # 3. Sauvegarder l'ancien dans previous (si on a un ancien pointeur)
+    if current_version:
+        previous_path = MODELS_DIR / "previous"
+        if previous_path.exists():
+            shutil.rmtree(previous_path)
+        shutil.copytree(MODELS_DIR / current_version, previous_path)
+
+    # 4. Switch atomique : on met juste à jour le pointeur (fichier texte)
+    _set_pointer(new_version_name)
 
 
 def main() -> int:
-    """Run the promotion pipeline."""
     try:
-        _check_eligibility(CANDIDATE_DIR)
-        _backup_accepted()
+        _check_eligibility_and_bundle(CANDIDATE_DIR)
         _atomic_promote(CANDIDATE_DIR)
     except Exception as error:
         print(f"Promotion failed: {error}", file=sys.stderr)
         return 1
 
-    metadata = json.loads((ACCEPTED_DIR / "model-metadata.json").read_text())
     print("Promotion complete.")
-    print(f"Accepted model_version: {metadata.get('model_version')}")
     return 0
 
 

@@ -1,73 +1,98 @@
+import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
 from bike_demand import promote
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 @pytest.fixture
 def setup_dirs(tmp_path, monkeypatch):
-    """Set up temporary candidate, accepted and previous directories."""
-    candidate_dir = tmp_path / "artifacts" / "candidate"
+    """Set up temporary directories and a valid candidate."""
+    candidate_dir = tmp_path / "candidate"
     candidate_dir.mkdir(parents=True)
-    accepted_dir = tmp_path / "models" / "accepted"
-    accepted_dir.mkdir(parents=True)
-    previous_dir = tmp_path / "models" / "previous"
-    previous_dir.mkdir(parents=True)
+    models_dir = tmp_path / "models"
+    models_dir.mkdir(parents=True)
 
-    # Place a known accepted bundle so we can assert it stays unchanged
-    (accepted_dir / "model.joblib").write_text("OLD_MODEL")
-    (accepted_dir / "model-metadata.json").write_text(
-        json.dumps({"model_version": "old"})
+    # Créer un faux candidat valide
+    (candidate_dir / "model.joblib").write_text("NEW_MODEL")
+    (candidate_dir / "model-metadata.json").write_text(
+        json.dumps({"model_version": "new"})
     )
 
-    # Patch module-level paths to the temporary directories
+    bundle = {
+        "model.joblib": _sha256(candidate_dir / "model.joblib"),
+        "model-metadata.json": _sha256(candidate_dir / "model-metadata.json"),
+    }
+    (candidate_dir / "bundle.json").write_text(json.dumps(bundle))
+    (candidate_dir / "decision_record.json").write_text(
+        json.dumps(
+            {
+                "outcome": "Eligible",
+                "bundle_sha256": _sha256(candidate_dir / "bundle.json"),
+            }
+        )
+    )
+
+    # Simuler un ancien accepted
+    (models_dir / "version-old").mkdir()
+    (models_dir / "version-old" / "model.joblib").write_text("OLD_MODEL")
+    (models_dir / "accepted_pointer.txt").write_text("version-old")
+
     monkeypatch.setattr(promote, "CANDIDATE_DIR", candidate_dir)
-    monkeypatch.setattr(promote, "ACCEPTED_DIR", accepted_dir)
-    monkeypatch.setattr(promote, "PREVIOUS_DIR", previous_dir)
-
-    return candidate_dir, accepted_dir, previous_dir
-
-
-def test_promotion_fails_if_not_eligible(setup_dirs):
-    """An ineligible decision record must leave the accepted bundle unchanged."""
-    candidate_dir, accepted_dir, _ = setup_dirs
-
-    (candidate_dir / "model.joblib").write_text("NEW_MODEL")
-    (candidate_dir / "model-metadata.json").write_text(
-        json.dumps({"model_version": "new"})
+    monkeypatch.setattr(promote, "MODELS_DIR", models_dir)
+    monkeypatch.setattr(
+        promote, "ACCEPTED_POINTER", models_dir / "accepted_pointer.txt"
     )
-    (candidate_dir / "decision_record.json").write_text(
-        json.dumps({"outcome": "Rejected"})
+
+    return candidate_dir, models_dir
+
+
+def test_promotion_fails_if_metadata_is_modified(setup_dirs):
+    """Changing metadata after the decision must fail the promotion."""
+    candidate_dir, models_dir = setup_dirs
+    # Modifier le fichier de métadonnées après la décision
+    (candidate_dir / "model-metadata.json").write_text(
+        json.dumps({"model_version": "HACKED"})
     )
 
     result = promote.main()
     assert result == 1
-
-    # Accepted bundle must not change
-    assert (accepted_dir / "model.joblib").read_text() == "OLD_MODEL"
-    assert (accepted_dir / "model-metadata.json").read_text() == (
-        '{"model_version": "old"}'
-    )
+    # L'état accepted n'a pas changé
+    assert (models_dir / "accepted_pointer.txt").read_text() == "version-old"
+    assert (models_dir / "version-old" / "model.joblib").read_text() == "OLD_MODEL"
 
 
-def test_promotion_fails_on_digest_mismatch(setup_dirs):
-    """A digest mismatch must leave the accepted bundle unchanged."""
-    candidate_dir, accepted_dir, _ = setup_dirs
+def test_promotion_fails_if_staging_is_interrupted(setup_dirs, monkeypatch):
+    """An interrupted copy must leave accepted and previous untouched."""
+    candidate_dir, models_dir = setup_dirs
 
-    (candidate_dir / "model.joblib").write_text("NEW_MODEL")
-    (candidate_dir / "model-metadata.json").write_text(
-        json.dumps({"model_version": "new"})
-    )
-    (candidate_dir / "decision_record.json").write_text(
-        json.dumps({"outcome": "Eligible", "candidate_sha256": "WRONG_DIGEST"})
-    )
+    # Simuler une erreur pendant la copie
+    def mock_copy(*args, **kwargs):
+        raise OSError("Simulated copy failure")
+
+    monkeypatch.setattr("shutil.copy2", mock_copy)
 
     result = promote.main()
     assert result == 1
+    assert (models_dir / "accepted_pointer.txt").read_text() == "version-old"
 
-    # Accepted bundle must not change
-    assert (accepted_dir / "model.joblib").read_text() == "OLD_MODEL"
-    assert (accepted_dir / "model-metadata.json").read_text() == (
-        '{"model_version": "old"}'
-    )
+
+def test_promotion_fails_if_switch_is_interrupted(setup_dirs, monkeypatch):
+    """An interrupted pointer update must leave accepted unchanged."""
+    candidate_dir, models_dir = setup_dirs
+
+    # Simuler une erreur au moment du switch final
+    def mock_move(*args, **kwargs):
+        raise OSError("Simulated move failure")
+
+    monkeypatch.setattr("shutil.move", mock_move)
+
+    result = promote.main()
+    assert result == 1
+    assert (models_dir / "accepted_pointer.txt").read_text() == "version-old"
