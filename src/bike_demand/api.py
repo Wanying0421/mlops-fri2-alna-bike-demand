@@ -45,11 +45,10 @@ class BikePredictionRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model using either the pointer or direct paths."""
+    """Load the model using the versions.json pointer or explicit paths."""
     models_dir = Path(os.getenv("MODELS_DIR", "models"))
-    current_pointer = models_dir / "current_version.txt"
+    versions_file = models_dir / "versions.json"
 
-    # Fallback to explicit paths for tests and backwards compatibility
     explicit_model_path = os.getenv("MODEL_PATH")
     explicit_metadata_path = os.getenv("METADATA_PATH")
 
@@ -57,19 +56,17 @@ async def lifespan(app: FastAPI):
     metadata_path = None
 
     if explicit_model_path and explicit_metadata_path:
-        # Old behavior (used by tests)
         model_path = Path(explicit_model_path)
         metadata_path = Path(explicit_metadata_path)
-    elif current_pointer.exists():
-        # New behavior (used by promotion)
-        version_dir = current_pointer.read_text().strip()
-        model_dir = models_dir / version_dir
-        model_path = model_dir / "model.joblib"
-        metadata_path = model_dir / "model-metadata.json"
+    elif versions_file.exists():
+        versions = json.loads(versions_file.read_text())
+        current = versions.get("current")
+        if current:
+            model_dir = models_dir / current
+            model_path = model_dir / "model.joblib"
+            metadata_path = model_dir / "model-metadata.json"
     else:
-        print(
-            "No MODEL_PATH or current_version.txt pointer found. Model will not load."
-        )
+        print("No MODEL_PATH or versions.json found. Model will not load.")
         yield
         return
 
