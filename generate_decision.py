@@ -19,30 +19,44 @@ def create_decision_record():
 
     metadata_exists = False
     metadata = {}
+    outcome = "Blocked/Error"
+    reasons = ["Required evidence or provenance data is missing or invalid."]
 
-    if not bundles:
-        outcome, reasons = evaluate_quality_gate({}, {}, provenance_valid=False)
-    else:
+    if bundles:
         latest_bundle = sorted(bundles)[-1]
         metadata_path = latest_bundle / "model-metadata.json"
-        if not metadata_path.exists():
-            outcome, reasons = evaluate_quality_gate({}, {}, provenance_valid=False)
-        else:
-            metadata_exists = True
-            with open(metadata_path, "r") as f:
-                metadata = json.load(f)
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, "r") as f:
+                    metadata = json.load(f)
+                metadata_exists = True
 
-            status = metadata.get("status", "evaluated")
-            if status == "not_evaluated":
+                # Check evaluation status fields
+                status = metadata.get("status", "evaluated")
+                eval_status = metadata.get("evaluation_status", "evaluated")
+
+                if status == "not_evaluated" or eval_status == "not_evaluated":
+                    outcome, reasons = (
+                        "Blocked/Error",
+                        ["Candidate model evaluation status is not_evaluated."],
+                    )
+                else:
+                    metrics = metadata.get("metrics")
+                    if not isinstance(metrics, dict) or "mae" not in metrics:
+                        outcome, reasons = (
+                            "Blocked/Error",
+                            ["Malformed or missing metrics in model metadata."],
+                        )
+                    else:
+                        candidate_metrics = {"mae": metrics.get("mae")}
+                        incumbent_metrics = {"mae": 10.0}
+                        outcome, reasons = evaluate_quality_gate(
+                            candidate_metrics, incumbent_metrics, provenance_valid=True
+                        )
+            except Exception as e:
                 outcome, reasons = (
                     "Blocked/Error",
-                    ["Candidate model status is not_evaluated."],
-                )
-            else:
-                candidate_metrics = {"mae": metadata.get("metrics", {}).get("mae")}
-                incumbent_metrics = {"mae": 10.0}
-                outcome, reasons = evaluate_quality_gate(
-                    candidate_metrics, incumbent_metrics, provenance_valid=True
+                    [f"Failed to parse metadata: {str(e)}"],
                 )
 
     record = {

@@ -4,6 +4,6 @@
   "incumbent_identity": "bike-demand-incumbent-baseline",
   "outcome": "Blocked/Error",
   "reasons": [
-    "Invalid or non-finite candidate MAE value: None"
+    "Candidate model evaluation status is not_evaluated."
   ]
 }
