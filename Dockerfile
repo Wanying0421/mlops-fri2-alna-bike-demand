@@ -26,7 +26,7 @@ COPY README.md ./README.md
 COPY .github/workflows/ci.yml ./.github/workflows/ci.yml
 COPY reports/week-01-team.md ./reports/week-01-team.md
 
-COPY artifacts ./artifacts
+COPY models/accepted ./artifacts
 RUN mkdir -p tracking artifacts reports
 
 RUN uv sync --locked

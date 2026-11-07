@@ -335,7 +335,7 @@ end-to-end decided-candidate command, evaluator, gate or promotion workflow.
 Shared interfaces and handoffs are documented in
 [the Lab 7 contract](docs/lab7-contract.md).
 
-### Member 1: clean-checkout commands
+### Clean-checkout commands
 
 Use Python 3.12 and the existing lock file from the repository root:
 
@@ -427,8 +427,18 @@ message nor tag `m3` proves them. Tag `m4` follows completion of Labs 7–8.
 See the [Week 4 team report](reports/week-04-team.md) and
 [Member 1 local evidence](evidence/lab7/member1/README.md).
 
-## Pipeline and Gate (Member 3 Documentation)
+## Pipeline and Gate
 - **Quality Gate Policy:** Evaluates candidate models against mandatory quality, operational, and integrity criteria.
 - **Outcomes Supported:** `Eligible`, `Rejected`, and `Blocked/Error`.
 - **Decision Records:** Generated decision records are stored in `evidence/decision_record.json` detailing policy version, identities, measurements, and outcome reasons.
 - **Testing:** Unit tests verifying valid eligibility, rejections, missing provenance, and non-finite metric blocking are implemented under `tests/test_gate.py`.
+
+### Promotion
+The candidate model is promoted manually from reviewed `main`:
+    uv run python -m bike_demand.promote
+This moves the current `models/accepted/` bundle to `models/previous/` and copies the candidate artifacts into `models/accepted/`.
+
+### Rollback (without retraining)
+To recover the previous accepted model:
+    Copy-Item models/previous/* models/accepted/ -Force
+Then rebuild the Docker image.
