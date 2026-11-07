@@ -12,7 +12,6 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# Global state to store the loaded model and its metadata version
 class ModelStore:
     def __init__(self):
         self.model: Optional[Any] = None
@@ -45,30 +44,32 @@ class BikePredictionRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model using the versions.json pointer or explicit paths."""
-    models_dir = Path(os.getenv("MODELS_DIR", "models"))
-    versions_file = models_dir / "versions.json"
-
+    """Load the model. Explicit paths take priority; fallback to versions.json."""
     explicit_model_path = os.getenv("MODEL_PATH")
     explicit_metadata_path = os.getenv("METADATA_PATH")
 
     model_path = None
     metadata_path = None
 
-    if explicit_model_path and explicit_metadata_path:
-        model_path = Path(explicit_model_path)
-        metadata_path = Path(explicit_metadata_path)
-    elif versions_file.exists():
-        versions = json.loads(versions_file.read_text())
-        current = versions.get("current")
-        if current:
-            model_dir = models_dir / current
-            model_path = model_dir / "model.joblib"
-            metadata_path = model_dir / "model-metadata.json"
+    # 1. If explicit paths are given, use them strictly (tests rely on this)
+    if explicit_model_path is not None or explicit_metadata_path is not None:
+        model_path = Path(explicit_model_path) if explicit_model_path else None
+        metadata_path = Path(explicit_metadata_path) if explicit_metadata_path else None
     else:
-        print("No MODEL_PATH or versions.json found. Model will not load.")
-        yield
-        return
+        # 2. Otherwise, use versions.json if it exists
+        models_dir = Path(os.getenv("MODELS_DIR", "models"))
+        versions_file = models_dir / "versions.json"
+        if versions_file.exists():
+            versions = json.loads(versions_file.read_text())
+            current = versions.get("current")
+            if current:
+                model_dir = models_dir / current
+                model_path = model_dir / "model.joblib"
+                metadata_path = model_dir / "model-metadata.json"
+        else:
+            # 3. Final fallback: artifacts/
+            model_path = Path("artifacts/model.joblib")
+            metadata_path = Path("artifacts/model-metadata.json")
 
     if metadata_path and metadata_path.exists():
         try:
