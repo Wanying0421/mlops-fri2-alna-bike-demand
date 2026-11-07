@@ -31,22 +31,32 @@ The team interface and ownership proposal is in
 are in the README's **Pipeline and gate** section. Local check scope and raw
 results are in [`evidence/lab7/member1/`](../evidence/lab7/member1/).
 
-### Results still required before completion
+### Integration and verification
 
-- Independent review, author response, green checks on the actual PR revision
-  and manual merge of Member 1's component.
-- Reviewed and committed policy with justified thresholds, operational limits
-  and candidate/compute budget **before** real candidate evaluation.
-- Actual trusted accepted reference, three-way validation evaluation and
-  complete quality/operation/integrity decision evidence.
-- One end-to-end command producing a decided candidate after the evaluator and
-  gate are integrated; the current commands cover input checks and training.
-- Independent rejection challenge showing unchanged accepted and served state.
-- Durable immutable version storage, exact-byte manual promotion from reviewed
-  green main, verified live identities and retained previous bundle/revision.
-- Final evaluation, decision and state design answers, evidence links and
-  recovery handoff for Lab 8.
+The training pipeline was merged in [PR #18](https://github.com/Wanying0421/mlops-fri2-alna-bike-demand/pull/18). [PR #21](https://github.com/Wanying0421/mlops-fri2-alna-bike-demand/pull/21) updated the quality gate and decision record generation. [PR #20](https://github.com/Wanying0421/mlops-fri2-alna-bike-demand/pull/20) added manual promotion and rollback. Both PRs are now merged into `main`.
 
-No real candidate validation score, gate result, promotion or live service
-verification is reported by this Member 1 preparation. Each member must also
-submit their own private `reports/week-4.md`; this team report does not replace it.
+### Peer review: repeated promotion
+
+During the review of PR #20, Laroche reproduced a rollback issue with the sequence A → B → B. After promoting B a second time, both `current` and `previous` pointed to B, so the rollback reference no longer pointed to A.
+
+Anas updated the promotion command so that running it again for the active model leaves both references unchanged. He added a regression test for this scenario. The expected result is `current = B` and `previous = A`. Both GitHub checks passed before the merge.
+
+### Local results on `main`
+
+| Check | Observed result |
+| --- | --- |
+| Dataset and chronological split | `inputs_validated`: 8,645 training rows, 4,358 validation rows and 4,376 held-out test rows. |
+| Candidate bundle | `bundle_verified` for the candidate linked in the [training evidence](../evidence/lab7/training/candidate-371763a94ef249af915ac55c3355351a/). |
+| Candidate evaluation | `not_evaluated`: this run did not produce a validation score or a gate decision. |
+
+The following captures show the local Docker demonstration shared in PR #20:
+
+![Model version served after promotion in local Docker](images/lab-07-health-local.png)
+
+![Previous model version served after rollback in local Docker](images/lab-07-rollback-local.png)
+
+### Evidence still to document
+
+- The command that runs training, evaluation and the gate together, with a link to the gate policy and a decision based on the validation results.
+- A rejection example showing that the accepted model stayed unchanged.
+- The model version and revision verified on Cloud Run, with the previous revision identified for rollback.
