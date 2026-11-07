@@ -1,0 +1,13 @@
+{
+  "policy_version": "v1.0",
+  "candidate_identity": "bike-demand-candidate-01",
+  "incumbent_identity": "bike-demand-incumbent-01",
+  "measurements": {
+    "candidate_mae": 9.2,
+    "incumbent_mae": 10.0
+  },
+  "outcome": "Eligible",
+  "reasons": [
+    "All mandatory quality, operational, and integrity criteria passed."
+  ]
+}

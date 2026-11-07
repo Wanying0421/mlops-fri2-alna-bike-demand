@@ -1,0 +1,15 @@
+{
+  "scope": "Local Linux verification of the review fix against the previously delivered Member 1 code. Not a GitHub CI, Windows, gate or deployment result.",
+  "user_reported_pr": "https://github.com/Wanying0421/mlops-fri2-alna-bike-demand/pull/18",
+  "user_reported_previous_head": "2312dc9",
+  "full_suite": "122 passed, 1 existing dependency warning",
+  "negative_control": "Removing digest comparison fails the model-corruption regression with exit 1.",
+  "restored_control": "Original verifier restored byte-for-byte; same regression passes with exit 0.",
+  "files_sha256": {
+    "src/bike_demand/bundles.py": "d7670e99a50af6f7e5390c03cb02eaa1f4b2ae760ff309db2282d5cab4c6764c",
+    "src/bike_demand/pipeline.py": "606502eb817c8f7e22522551b073b99fe3624be9d8d3ac3accf2bd3cf0fe5850",
+    "tests/test_pipeline.py": "5be7e65af9943090228394719853e92ea6540445a3a764540d76d50743de70e0",
+    "docs/lab7-contract.md": "489dd28321492dfb98bd437d7611e2bc5a816457a5233a0a7fbbe4e2235d058e",
+    "README.md": "62729b8c594f064ac6fc0c337addf3ba01d99486971d352e6d51738658547e92"
+  }
+}

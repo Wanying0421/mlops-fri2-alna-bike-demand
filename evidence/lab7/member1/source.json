@@ -1,0 +1,7 @@
+{
+  "source_kind": "user-supplied git archive",
+  "source_archive_sha256": "7a65942b161dfda96a4accc61ca412ce26939a6df7b68277d1d4300b1e1b5084",
+  "source_commit": "7d7e10fd3a3f36533c077732d21d07177fad32d6",
+  "scope": "Local Linux checks of Member 1 changes against the supplied archive; not GitHub CI or Cloud Run verification",
+  "real_candidate_evaluation_performed": false
+}

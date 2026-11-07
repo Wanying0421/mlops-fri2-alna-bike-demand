@@ -37,3 +37,6 @@
 **/.env
 **/.env.*
 **/secrets
+
+# Local Lab 7 candidates are not automatically included in an API image.
+artifacts/candidates/

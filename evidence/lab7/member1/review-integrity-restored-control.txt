@@ -1,0 +1,3 @@
+RESTORED CONTROL: original verifier restored byte-for-byte; expect the same regression test to pass.
+.                                                                        [100%]
+1 passed in 1.34s
