@@ -1,6 +1,4 @@
-import json
 from math import isfinite
-from pathlib import Path
 
 
 def finite_number(value):
