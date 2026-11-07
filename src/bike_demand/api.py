@@ -12,7 +12,6 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# Global state to store the loaded model and its metadata version
 class ModelStore:
     def __init__(self):
         self.model: Optional[Any] = None
@@ -45,10 +44,34 @@ class BikePredictionRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    model_path = Path(os.getenv("MODEL_PATH", "artifacts/model.joblib"))
-    metadata_path = Path(os.getenv("METADATA_PATH", "artifacts/model-metadata.json"))
+    """Load the model. Explicit paths take priority; fallback to versions.json."""
+    explicit_model_path = os.getenv("MODEL_PATH")
+    explicit_metadata_path = os.getenv("METADATA_PATH")
 
-    if metadata_path.exists():
+    model_path = None
+    metadata_path = None
+
+    # 1. If explicit paths are given, use them strictly (tests rely on this)
+    if explicit_model_path is not None or explicit_metadata_path is not None:
+        model_path = Path(explicit_model_path) if explicit_model_path else None
+        metadata_path = Path(explicit_metadata_path) if explicit_metadata_path else None
+    else:
+        # 2. Otherwise, use versions.json if it exists
+        models_dir = Path(os.getenv("MODELS_DIR", "models"))
+        versions_file = models_dir / "versions.json"
+        if versions_file.exists():
+            versions = json.loads(versions_file.read_text())
+            current = versions.get("current")
+            if current:
+                model_dir = models_dir / current
+                model_path = model_dir / "model.joblib"
+                metadata_path = model_dir / "model-metadata.json"
+        else:
+            # 3. Final fallback: artifacts/
+            model_path = Path("artifacts/model.joblib")
+            metadata_path = Path("artifacts/model-metadata.json")
+
+    if metadata_path and metadata_path.exists():
         try:
             with open(metadata_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
@@ -61,7 +84,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Error reading metadata: {e}")
 
-    if model_path.exists():
+    if model_path and model_path.exists():
         try:
             artifact = joblib.load(model_path)
             if isinstance(artifact, dict) and "model" in artifact:
@@ -81,17 +104,14 @@ async def lifespan(app: FastAPI):
     model_store.feature_names = None
 
 
-# Initialize FastAPI app with lifespan
 app = FastAPI(title="Bike Demand Prediction API", version="1.0.0", lifespan=lifespan)
 
-# Configure basic logging to output single-line JSON
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("bike_demand")
 
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Middleware to log each request's event, status code, duration, and model version, including exceptions."""
     start_time = time.time()
     status_code = 500
     try:
@@ -116,7 +136,6 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint to verify service and model status."""
     if not model_store.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
     git_sha = os.getenv("GIT_SHA", "unknown")
@@ -129,7 +148,6 @@ def health_check():
 
 @app.post("/predict")
 def predict(payload: BikePredictionRequest):
-    """Predict bike demand based on input features with non-negative guard."""
     if not model_store.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
     try:
