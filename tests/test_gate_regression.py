@@ -1,14 +1,7 @@
-import sys
-from pathlib import Path
+import json
 
-root_dir = Path(__file__).resolve().parent.parent
-if str(root_dir) not in sys.path:
-    sys.path.insert(0, str(root_dir))
-
-import json  # noqa: E402
-
-import generate_decision  # noqa: E402
-from bike_demand.gate import evaluate_quality_gate  # noqa: E402
+from bike_demand import generate_decision
+from bike_demand.gate import evaluate_quality_gate
 
 
 def test_missing_evidence_blocks():
