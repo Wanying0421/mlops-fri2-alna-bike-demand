@@ -8,91 +8,87 @@ from bike_demand import promote
 
 
 def _sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of a file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @pytest.fixture
 def setup_dirs(tmp_path, monkeypatch):
-    """Set up temporary directories and a valid candidate."""
+    """Create temporary candidate and models directories."""
     candidate_dir = tmp_path / "candidate"
     candidate_dir.mkdir(parents=True)
     models_dir = tmp_path / "models"
     models_dir.mkdir(parents=True)
 
-    # Créer un faux candidat valide
+    # Build a valid candidate bundle
     (candidate_dir / "model.joblib").write_text("NEW_MODEL")
     (candidate_dir / "model-metadata.json").write_text(
         json.dumps({"model_version": "new"})
     )
 
     bundle = {
-        "model.joblib": _sha256(candidate_dir / "model.joblib"),
-        "model-metadata.json": _sha256(candidate_dir / "model-metadata.json"),
+        "candidate_id": "cand-123",
+        "files": {
+            "model.joblib": _sha256(candidate_dir / "model.joblib"),
+            "model-metadata.json": _sha256(candidate_dir / "model-metadata.json"),
+        },
     }
     (candidate_dir / "bundle.json").write_text(json.dumps(bundle))
-    (candidate_dir / "decision_record.json").write_text(
-        json.dumps(
-            {
-                "outcome": "Eligible",
-                "bundle_sha256": _sha256(candidate_dir / "bundle.json"),
-            }
-        )
-    )
 
-    # Simuler un ancien accepted
+    decision = {
+        "outcome": "Eligible",
+        "candidate_id": "cand-123",
+        "bundle_sha256": _sha256(candidate_dir / "bundle.json"),
+    }
+    (candidate_dir / "decision_record.json").write_text(json.dumps(decision))
+
+    # Simulate an existing accepted and previous version
     (models_dir / "version-old").mkdir()
     (models_dir / "version-old" / "model.joblib").write_text("OLD_MODEL")
-    (models_dir / "accepted_pointer.txt").write_text("version-old")
+    (models_dir / "version-old" / "model-metadata.json").write_text(
+        '{"model_version": "old"}'
+    )
+    (models_dir / "current_version.txt").write_text("version-old")
+    (models_dir / "previous_version.txt").write_text("version-older")
 
+    # Patch module-level paths
     monkeypatch.setattr(promote, "CANDIDATE_DIR", candidate_dir)
     monkeypatch.setattr(promote, "MODELS_DIR", models_dir)
+    monkeypatch.setattr(promote, "CURRENT_POINTER", models_dir / "current_version.txt")
     monkeypatch.setattr(
-        promote, "ACCEPTED_POINTER", models_dir / "accepted_pointer.txt"
+        promote, "PREVIOUS_POINTER", models_dir / "previous_version.txt"
     )
 
     return candidate_dir, models_dir
 
 
-def test_promotion_fails_if_metadata_is_modified(setup_dirs):
-    """Changing metadata after the decision must fail the promotion."""
+def test_manifest_rejects_invalid_candidate_id(setup_dirs):
+    """A wrong candidate ID in the bundle must block promotion."""
     candidate_dir, models_dir = setup_dirs
-    # Modifier le fichier de métadonnées après la décision
-    (candidate_dir / "model-metadata.json").write_text(
-        json.dumps({"model_version": "HACKED"})
-    )
+    bundle = json.loads((candidate_dir / "bundle.json").read_text())
+    bundle["candidate_id"] = "WRONG_ID"
+    (candidate_dir / "bundle.json").write_text(json.dumps(bundle))
 
     result = promote.main()
     assert result == 1
-    # L'état accepted n'a pas changé
-    assert (models_dir / "accepted_pointer.txt").read_text() == "version-old"
-    assert (models_dir / "version-old" / "model.joblib").read_text() == "OLD_MODEL"
+    assert (models_dir / "current_version.txt").read_text() == "version-old"
 
 
-def test_promotion_fails_if_staging_is_interrupted(setup_dirs, monkeypatch):
-    """An interrupted copy must leave accepted and previous untouched."""
+def test_pointer_switch_failure_leaves_previous_intact(setup_dirs, monkeypatch):
+    """A crash during the pointer update must leave both references unchanged."""
     candidate_dir, models_dir = setup_dirs
 
-    # Simuler une erreur pendant la copie
-    def mock_copy(*args, **kwargs):
-        raise OSError("Simulated copy failure")
+    original_move = promote.shutil.move
 
-    monkeypatch.setattr("shutil.copy2", mock_copy)
+    def mock_move(src, dst):
+        # Fail only on the final pointer update
+        if "current.txt" in str(src) or "previous.txt" in str(src):
+            raise OSError("Simulated pointer crash")
+        return original_move(src, dst)
+
+    monkeypatch.setattr(promote.shutil, "move", mock_move)
 
     result = promote.main()
     assert result == 1
-    assert (models_dir / "accepted_pointer.txt").read_text() == "version-old"
-
-
-def test_promotion_fails_if_switch_is_interrupted(setup_dirs, monkeypatch):
-    """An interrupted pointer update must leave accepted unchanged."""
-    candidate_dir, models_dir = setup_dirs
-
-    # Simuler une erreur au moment du switch final
-    def mock_move(*args, **kwargs):
-        raise OSError("Simulated move failure")
-
-    monkeypatch.setattr("shutil.move", mock_move)
-
-    result = promote.main()
-    assert result == 1
-    assert (models_dir / "accepted_pointer.txt").read_text() == "version-old"
+    assert (models_dir / "current_version.txt").read_text() == "version-old"
+    assert (models_dir / "previous_version.txt").read_text() == "version-older"

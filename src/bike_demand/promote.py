@@ -7,108 +7,111 @@ from pathlib import Path
 
 CANDIDATE_DIR = Path("artifacts/candidate")
 MODELS_DIR = Path("models")
-ACCEPTED_POINTER = MODELS_DIR / "accepted_pointer.txt"
+CURRENT_POINTER = MODELS_DIR / "current_version.txt"
+PREVIOUS_POINTER = MODELS_DIR / "previous_version.txt"
 REQUIRED_FILES = ("model.joblib", "model-metadata.json")
 
 
-def _calculate_sha256(path: Path) -> str:
+def _sha256(path: Path) -> str:
     """Compute the SHA-256 digest of a file."""
-    sha256 = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            sha256.update(chunk)
-    return sha256.hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _check_eligibility_and_bundle(candidate_dir: Path) -> Path:
-    """Verify eligibility and the complete bundle digest."""
+def _check_eligibility_and_bundle(candidate_dir: Path) -> None:
+    """Verify eligibility and that the complete bundle matches its manifest."""
     decision_file = candidate_dir / "decision_record.json"
-    bundle_file = candidate_dir / "bundle.json"
-
-    if not decision_file.exists() or not bundle_file.exists():
-        raise ValueError("Missing decision_record.json or bundle.json")
+    if not decision_file.exists():
+        raise ValueError("Missing decision_record.json")
 
     decision = json.loads(decision_file.read_text())
     if decision.get("outcome") != "Eligible":
-        raise ValueError(f"Candidate is not eligible: {decision.get('outcome')}")
+        raise ValueError(f"Not eligible: {decision.get('outcome')}")
 
-    # On vérifie que le bundle entier correspond au SHA-256 de la décision
+    candidate_id = decision.get("candidate_id")
     expected_digest = decision.get("bundle_sha256")
-    if not expected_digest:
-        raise ValueError("Decision record missing bundle_sha256")
+    if not candidate_id or not expected_digest:
+        raise ValueError("Decision missing candidate_id or bundle_sha256")
 
-    actual_digest = _calculate_sha256(bundle_file)
-    if actual_digest != expected_digest:
-        raise ValueError("Bundle SHA-256 digest mismatch")
+    # 1. Verify the manifest digest matches the decision
+    bundle_file = candidate_dir / "bundle.json"
+    if not bundle_file.exists():
+        raise ValueError("Missing bundle.json")
 
-    # On vérifie que le bundle.json correspond bien aux fichiers présents
+    if _sha256(bundle_file) != expected_digest:
+        raise ValueError("Bundle digest mismatch")
+
+    # 2. Verify the bundle contains the right candidate ID and file digests
     bundle = json.loads(bundle_file.read_text())
-    for name, file_digest in bundle.items():
+    if bundle.get("candidate_id") != candidate_id:
+        raise ValueError("Candidate ID mismatch in bundle.json")
+
+    for name, expected_file_hash in bundle.get("files", {}).items():
         path = candidate_dir / name
         if not path.exists():
             raise FileNotFoundError(f"Missing file in bundle: {name}")
-        if _calculate_sha256(path) != file_digest:
+        if _sha256(path) != expected_file_hash:
             raise ValueError(f"File digest mismatch for {name}")
 
-    return candidate_dir
+
+def _read_pointer(pointer: Path) -> str | None:
+    """Read a version pointer if it exists."""
+    return pointer.read_text().strip() if pointer.exists() else None
 
 
-def _get_current_accepted() -> str | None:
-    if ACCEPTED_POINTER.exists():
-        return ACCEPTED_POINTER.read_text().strip()
-    return None
+def _write_pointers(current: str | None, previous: str | None) -> None:
+    """Atomically write both current and previous pointers."""
+    with tempfile.TemporaryDirectory(dir=MODELS_DIR) as temp_dir:
+        tmp_current = Path(temp_dir) / "current.txt"
+        tmp_previous = Path(temp_dir) / "previous.txt"
 
+        if current:
+            tmp_current.write_text(current)
+        if previous:
+            tmp_previous.write_text(previous)
 
-def _set_pointer(version_dir_name: str) -> None:
-    # Écriture atomique du pointeur
-    with tempfile.NamedTemporaryFile("w", dir=MODELS_DIR, delete=False) as f:
-        f.write(version_dir_name)
-        temp_path = f.name
-    shutil.move(temp_path, ACCEPTED_POINTER)
+        # Move each pointer into place as atomically as possible
+        if current:
+            shutil.move(str(tmp_current), CURRENT_POINTER)
+        if previous:
+            shutil.move(str(tmp_previous), PREVIOUS_POINTER)
 
 
 def _atomic_promote(candidate_dir: Path) -> None:
-    current_version = _get_current_accepted()
-    new_version_name = (
-        f"version-{_calculate_sha256(candidate_dir / 'model.joblib')[:8]}"
-    )
+    """Stage, verify, and atomically switch the accepted version."""
+    # 1. Compute the immutable directory name for the new version
+    model_hash = _sha256(candidate_dir / "model.joblib")[:8]
+    new_version_name = f"version-{model_hash}"
     new_version_path = MODELS_DIR / new_version_name
 
-    # 1. Préparer et vérifier dans le staging (on copie dans un dossier version-XXX)
+    # 2. Stage the complete bundle in a temporary directory
     with tempfile.TemporaryDirectory(dir=MODELS_DIR) as temp_dir:
         staging = Path(temp_dir)
         for name in REQUIRED_FILES:
             shutil.copy2(candidate_dir / name, staging / name)
 
-        # Vérification
+        # 3. Verify the staged bundle before making it active
         for name in REQUIRED_FILES:
             if not (staging / name).exists():
                 raise ValueError(f"Staging failed for {name}")
 
-        # 2. Déplacer le staging vers son dossier final
+        # 4. Move staging to its final immutable directory
         if new_version_path.exists():
             shutil.rmtree(new_version_path)
         shutil.move(str(staging), str(new_version_path))
 
-    # 3. Sauvegarder l'ancien dans previous (si on a un ancien pointeur)
-    if current_version:
-        previous_path = MODELS_DIR / "previous"
-        if previous_path.exists():
-            shutil.rmtree(previous_path)
-        shutil.copytree(MODELS_DIR / current_version, previous_path)
-
-    # 4. Switch atomique : on met juste à jour le pointeur (fichier texte)
-    _set_pointer(new_version_name)
+    # 5. Update both pointers only after staging is fully complete
+    current_version = _read_pointer(CURRENT_POINTER)
+    _write_pointers(current=new_version_name, previous=current_version)
 
 
 def main() -> int:
+    """Run the promotion pipeline."""
     try:
         _check_eligibility_and_bundle(CANDIDATE_DIR)
         _atomic_promote(CANDIDATE_DIR)
     except Exception as error:
         print(f"Promotion failed: {error}", file=sys.stderr)
         return 1
-
     print("Promotion complete.")
     return 0
 
