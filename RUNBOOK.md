@@ -22,3 +22,12 @@
 ## 5. Escalation & Last Verified Context
 - **Last Verified Context:** Lab 8 Incident Response Drill.
 - **Escalator / Owner:** Team Lead (Member 1).
+
+## 6. Member 1 Baseline & Endpoint Verification Record
+- **Endpoint Contracts Verified:** 
+  - `GET /health` validated (returns HTTP 200/503).
+  - `POST /predict` validated (returns valid nonnegative predictions with correct model version).
+- **Pre-Incident Reference Baseline:**
+  - **Traffic Rate / Request Count:** Nominal load verified via test suite baseline reference window.
+  - **p95 Latency:** < 500ms baseline.
+  - **Error Rate:** 0% baseline under standard test probe conditions.
