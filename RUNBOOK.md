@@ -18,7 +18,7 @@
   ```
 - **Post-Rollback Verification:** Run the deployment check script to validate endpoints:
   ```bash
-  uv run python check_deploy.py --base-url https://bike-demand-url-xyz.a.run.app --expected-model-version v1.2.0 --expected-git-sha 57c9eb3
+  uv run python check_deploy.py --base-url https://bike-demand-url-xyz.a.run.app --expected-model-version v1.2.0 --expected-git-sha 2b751ba2ae151e23669e113cfab2d472239729d7
   ```
 
 ## 4. Fresh Verification Steps
