@@ -327,16 +327,101 @@ Part 2: Tests, Defects & Tolerance Questions
 | **Tolerance**<br>*(Where does your number come from?)* | Tolerances (`pytest.approx` or defined error bounds) are derived from measured floating-point variation and deterministic model test fixture outputs. | Using arbitrary large tolerances or ignoring precision boundaries. | Strict tolerances ensure that numeric regressions or unstable feature transformations are detected immediately. |
 | **Repair**<br>*(Did you fix the cause or hide it?)* | Failures are resolved by fixing the underlying code logic or restoring expected model parity rather than suppressing test execution or modifying lockfiles. | Deleting failing tests or regenerating lock files to bypass failures. | Preserves absolute pipeline integrity and ensures code readability and reliability over a 3-month horizon. |
 
-## Cloud Run Continuous Deployment
+## Pipeline and gate
 
-### 1. Deployment Architecture
-The CI/CD pipeline extends beyond testing into automated production delivery. Upon a successful merge to `main`, the `deploy` job executes the following steps:
-- **Authentication**: Authenticates securely to Google Cloud using Workload Identity Federation (`WIF_PROVIDER` and `WIF_SERVICE_ACCOUNT`).
-- **Container Deployment**: Deploys the built container image to Google Cloud Run in region `europe-west1` under the service name `mlops-fri2-alna-bike-demand`.
-- **Live Smoke Check**: Executes `check_deploy.py` against the public Cloud Run URL to verify runtime model and code identity.
+Lab 7 starts with a **training-only component**. It does not yet implement the
+end-to-end decided-candidate command, evaluator, gate or promotion workflow.
+Shared interfaces and handoffs are documented in
+[the Lab 7 contract](docs/lab7-contract.md).
 
-### 2. Operational Contracts (Gate, Identity, Proof, Undo)
-- **Gate**: Protected by `needs: container` and a `main` branch push constraint.
-- **Identity**: Keyless OIDC token exchange via WIF (`id-token: write`).
-- **Proof**: Automated assertion matching the live service's `git_sha` and `model_version` against the build commit.
-- **Undo**: Immediate traffic redirection via Cloud Run revision management or clean `git revert` on `main`.
+### Member 1: clean-checkout commands
+
+Use Python 3.12 and the existing lock file from the repository root:
+
+```powershell
+uv sync --locked
+uv run --locked python -m bike_demand.pipeline check --config configs/baseline.yaml
+```
+
+The check validates the frozen CSV, twelve ordered predictors and chronological
+partition counts (8,645 train / 4,358 validation / 4,376 held test). It produces
+no model or evaluation score. After committing training code and configuration:
+
+```powershell
+uv run --locked python -m bike_demand.pipeline train --config configs/baseline.yaml
+```
+
+This command fits only the 2011 training rows and prints the new candidate
+location under `artifacts/candidates/candidate-<uuid>/`. Each bundle contains the
+model, metadata, exact config and lock, data manifest, actual environment,
+partition identities and a final `bundle.json` with SHA-256 and size per file.
+An optional `--candidate-id candidate-<name>` is write-once. Incomplete attempts
+have no completion marker and cannot be reused. Local files can still be edited;
+consumers must verify hashes and the version-store owner must make them durable.
+
+Training requires committed tracked files and training inputs. Unrelated
+untracked notes are allowed. No accepted pointer, default API model, existing
+MLflow database or legacy metrics file is changed. Exit 0 means **trained**, with
+`evaluation_status: not_evaluated`; it is not eligibility or deployment approval.
+The original `bike_demand.train` remains for baseline compatibility and must not
+be used as the Lab 7 candidate entry point because it overwrites fixed artifacts.
+
+### Verify a saved candidate before loading
+
+The review identified missing consumer-side checks for a saved bundle. The
+shared reader in `bike_demand.bundles` now verifies the manifest schema, exact
+file names, byte counts, SHA-256 values and metadata cross-references before
+model loading. `load_verified_model` loads the checked bytes from memory.
+The evaluator owner must use this reader in the forthcoming consumer.
+
+To audit the local candidate selected in PowerShell:
+
+```powershell
+uv run --locked python -m bike_demand.pipeline verify --candidate-dir $lab7Candidate.FullName
+```
+
+Use `--expected-bundle-sha256` to bind verification to a manifest digest recorded
+independently in trusted evidence or immutable storage. Success reports
+`bundle_verified` and `not_evaluated`; it does not establish policy eligibility.
+An invalid selected bundle exits 1 with a reason and remains unchanged.
+Pytest checks corrupted synthetic bundles, including the reviewer's changed
+manifest-digest case. It does not automatically inspect ignored local artifacts.
+
+### Pipeline design decisions
+
+| Question | Choice | Alternative | Reason |
+| --- | --- | --- | --- |
+| Stages | Separate input check, candidate training, evaluation, gate and manual promotion; the first two are implemented here | One training function overwriting the served model | Each stage has a distinct result and write boundary |
+| Entry point | One module with `check` and `train`; lead adds the full decided-candidate stage after Members 2–3 integrate | A sequence of undocumented notebook cells | Explicit CLI inputs support a clean checkout and later composition |
+| Failure | Nonzero exit and reason; no success marker for incomplete training; no automatic numeric retries | Retry a failed policy result until it passes | Failures stay visible and cannot change the accepted model |
+| Partial state | Reserve a unique directory; publish `bundle.json` last; refuse an existing ID | Reuse partly written output as a complete candidate | Consumers can distinguish complete bytes from interrupted work |
+| Identity | Version, model/bundle hashes, data/config/lock, full Git revision, installed environment and observation identities | Filename or seed alone | A decision must refer to the exact evaluated bytes and context |
+
+The training component bounds RF runs to 1–200 trees, depth 1–20, one worker and
+an explicit seed. These proposed compute bounds need team review. Member 3 must
+commit policy, rationale and candidate budget before real candidate evaluation;
+no quality threshold is inferred from observed results in this PR.
+
+Member 2 supplies a trusted frozen incumbent and evaluates all three predictors
+(candidate, incumbent, train-mean baseline) on the same validation rows. Member 3
+produces reasoned `eligible`, `rejected` or `blocked` decisions with mandatory
+quality, operation and integrity checks. Missing reference or invalid evidence
+blocks a decision from becoming eligible. All outcomes leave accepted/served
+state unchanged until Member 4's separately reviewed manual promotion.
+
+### Cloud Run transition
+
+The previous CI deployment job generated a **synthetic smoke fixture** and
+deployed automatically on pushes to `main`. Its final step echoed success; it
+did not perform the live identity check previously described here. This Lab 7
+change removes that deployment job and retains `Checks` and `Container`.
+It does not contact or replace the current live service.
+
+Member 4 must supply manual promotion from reviewed green `main`, deployment of
+the exact eligible bundle, keyless authentication, live `/health` and `/predict`
+identity verification, and retained previous/current accepted bundles and Cloud
+Run revisions for Lab 8. These results remain pending; neither the old success
+message nor tag `m3` proves them. Tag `m4` follows completion of Labs 7–8.
+
+See the [Week 4 team report](reports/week-04-team.md) and
+[Member 1 local evidence](evidence/lab7/member1/README.md).

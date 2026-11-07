@@ -1,0 +1,36 @@
+{
+  "candidate_id": "candidate-371763a94ef249af915ac55c3355351a",
+  "evaluation_status": "not_evaluated",
+  "files": {
+    "config.yaml": {
+      "bytes": 236,
+      "sha256": "3dca0849b8c7ec3c55dbcde93a20cb35811dd2994b004dcb6c6d482e203684a2"
+    },
+    "data-manifest.json": {
+      "bytes": 1099,
+      "sha256": "3b040125c40ccaca9bce625f26f692262d43f61fc5970c3bd1e39105af529596"
+    },
+    "environment.json": {
+      "bytes": 2916,
+      "sha256": "aee3a2cb75ac4a5c245e9c3be800c2c491e66eb016cfdd5de6ce5cd596bf88c0"
+    },
+    "model-metadata.json": {
+      "bytes": 1394,
+      "sha256": "e2ac312a85f108ffadc0a28a32ebc9c777443b89672fcea624c1b263500c30bf"
+    },
+    "model.joblib": {
+      "bytes": 5243601,
+      "sha256": "fd98ceafc57a5babce61ce703cbf9cb8d1f83c6820b0b34fe30ad1a0fc49c304"
+    },
+    "partitions.json": {
+      "bytes": 594,
+      "sha256": "83e20c635d7b1423cfeaf80fc1cd3c6582612e4e4983a724c4351fb05bb9a64b"
+    },
+    "uv.lock": {
+      "bytes": 191640,
+      "sha256": "a6d1c3bd05dd44f841bddbbaf9d1fd0f2252dc6944c6df2545b5843bb73c4675"
+    }
+  },
+  "schema_version": 1,
+  "stage": "trained"
+}

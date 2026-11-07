@@ -1,0 +1,12 @@
+{
+  ".dockerignore": "2391b6e55847dea185bff4d5a24f6f0cd43d59fb903c327a01dd5a2ec04b5355",
+  ".gitattributes": "ed5056e784f3fc3567ca0e112cf1089d5cb0955873e53a6a764a5c5ffee0aa87",
+  ".github/workflows/ci.yml": "14c1a2eebe2f56a68c8c85620b629c1ff5e620a0d12674cde68346b8d609081c",
+  "README.md": "069b8d7049cc16013f6a1c8c6840d2707027d93e8dea8a62a787f021a43dfbf9",
+  "src/bike_demand/pipeline.py": "ead466a3db0f7ee920a6edf1dca2cfedf2e51cabea9b2ae9149b1528617854b9",
+  "tests/test_pipeline.py": "dd520c050c1c693f30a6ccaba06bc3171f5b84e6c2601bd211d0933b42a2b615",
+  "docs/lab7-contract.md": "33398e4ec99ee69b0ad9b73906a0a5617e755cb73f355e41b13f6dc92dd061a5",
+  "reports/week-04-team.md": "bdb65ac6f00b446780040933e68b5afaf3c1676b894489304d1c2260ba24f31a",
+  "uv.lock": "a6d1c3bd05dd44f841bddbbaf9d1fd0f2252dc6944c6df2545b5843bb73c4675",
+  "pyproject.toml": "6432a1589199c72986f10af89bcaf14c3cf17cb2f2be9fe57ad549502d0aed45"
+}

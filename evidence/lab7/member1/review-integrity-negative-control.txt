@@ -1,0 +1,8 @@
+SYNTHETIC NEGATIVE CONTROL: deliberately remove digest comparison; pytest --tb=line; expected exit 1.
+F                                                                        [100%]
+=================================== FAILURES ===================================
+E   Failed: Corrupted bundles must never reach joblib.load
+/workspace/scratch/eac72b240e0a/lab7-review-fix/project/tests/test_pipeline.py:224: Failed: Corrupted bundles must never reach joblib.load
+=========================== short test summary info ============================
+FAILED tests/test_pipeline.py::test_changed_bundle_file_is_rejected_before_deserialization[model.joblib]
+1 failed in 1.21s
