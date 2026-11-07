@@ -326,6 +326,7 @@ Part 2: Tests, Defects & Tolerance Questions
 | **Failing / Records**<br>*(Can you make each test fail?)* | Yes, modifying the expected baseline output or altering input feature behavior forces an immediate failure, satisfying the red-to-green defect verification rule. | Passing tests by loosening assertions when code outputs change unexpectedly. | Muting or loosening assertions hides regressions instead of catching real defects. |
 | **Tolerance**<br>*(Where does your number come from?)* | Tolerances (`pytest.approx` or defined error bounds) are derived from measured floating-point variation and deterministic model test fixture outputs. | Using arbitrary large tolerances or ignoring precision boundaries. | Strict tolerances ensure that numeric regressions or unstable feature transformations are detected immediately. |
 | **Repair**<br>*(Did you fix the cause or hide it?)* | Failures are resolved by fixing the underlying code logic or restoring expected model parity rather than suppressing test execution or modifying lockfiles. | Deleting failing tests or regenerating lock files to bypass failures. | Preserves absolute pipeline integrity and ensures code readability and reliability over a 3-month horizon. |
+| **Repair**<br>*(Did you fix the cause or hide it?)* | Failures are resolved by fixing the underlying code logic or restoring expected model parity rather than suppressing test execution or modifying lockfiles. | Deleting failing tests or regenerating lock files to bypass failures. | Preserves absolute pipeline integrity and ensures code readability and reliability over a 3-month horizon. |
 
 ## Pipeline and gate
 
@@ -425,3 +426,9 @@ message nor tag `m3` proves them. Tag `m4` follows completion of Labs 7–8.
 
 See the [Week 4 team report](reports/week-04-team.md) and
 [Member 1 local evidence](evidence/lab7/member1/README.md).
+
+## Pipeline and Gate (Member 3 Documentation)
+- **Quality Gate Policy:** Evaluates candidate models against mandatory quality, operational, and integrity criteria.
+- **Outcomes Supported:** `Eligible`, `Rejected`, and `Blocked/Error`.
+- **Decision Records:** Generated decision records are stored in `evidence/decision_record.json` detailing policy version, identities, measurements, and outcome reasons.
+- **Testing:** Unit tests verifying valid eligibility, rejections, missing provenance, and non-finite metric blocking are implemented under `tests/test_gate.py`.
