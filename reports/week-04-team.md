@@ -105,7 +105,7 @@ The incident logs cover only a sample of requests, so they do not establish an o
 
 ### Evidence
 
-[Raw results from the 50 recovery probes](lab-08-evidence/recovery_health.txt)
+[Raw results from the 50 recovery probes](images/recovery_health.txt)
 
 **Figure 1 — Rollback request and subsequent traffic update**
 
