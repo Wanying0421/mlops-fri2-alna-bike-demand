@@ -109,12 +109,13 @@ The incident logs cover only a sample of requests, so they do not establish an o
 
 **Figure 1 — Rollback request and subsequent traffic update**
 
-![Cloud Run audit log](lab-08-evidence/01-traffic-audit.png)
+![Cloud Run audit log](images/01-traffic-audit.png)
+
 
 **Figure 2 — Failed requests and HTTP 200 on the recovered revision**
 
-![Cloud Run request logs](lab-08-evidence/02-request-logs.png)
+![Cloud Run request logs](images/02-request-logs.png)
 
 **Figure 3 — Recovery probes: 50 requests, 0 errors, p95 of 57.48 ms**
 
-![Recovery probe results](lab-08-evidence/03-recovery-probes.png)
+![Recovery probe results](images/03-recovery-probes.png)
