@@ -17,7 +17,7 @@ def evaluate_quality_gate(candidate_metrics, incumbent_metrics, provenance_valid
 
     cand_mae = candidate_metrics.get("mae")
     inc_mae = incumbent_metrics.get("mae", 10.0)
-    
+
     # Safely retrieve train-mean baseline and p95 latency if provided, with safe defaults for tests
     train_mean_mae = candidate_metrics.get("train_mean_mae")
     single_row_p95 = candidate_metrics.get("single_row_p95_ms")
