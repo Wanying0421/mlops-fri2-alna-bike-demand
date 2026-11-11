@@ -443,12 +443,12 @@ To recover the previous accepted model:
     Copy-Item models/previous/* models/accepted/ -Force
 Then rebuild the Docker image.
 
-## 1. Member 1 (Lead — Infrastructure, Baseline & Runbook Lead)
+## 1. Nouha SANTIR (Lead — Infrastructure, Baseline & Runbook Lead)
 - **Live Service Verification:** Validated health and prediction endpoint contracts.
 - **Baseline Measurement:** Recorded pre-incident reference traffic, UTC time window, p95 latency, and error metrics on Cloud Run.
 - **Runbook Framework:** Published initial [RUNBOOK.md](RUNBOOK.md) at repo root for operational guidance.
 
-## 2. Member 2 (Injector — Fault Engineering)
+## 2. Wanying XIONG (Injector — Fault Engineering)
 - **Fault Design:** Engineered a reversible failure (config/routing) contained within the team's Cloud Run environment.
 - **Controlled Execution:** Maintained secrecy during the drill to simulate real incident detection.
 - **Fault Documentation:** Logged private fault parameters for post-incident validation.
