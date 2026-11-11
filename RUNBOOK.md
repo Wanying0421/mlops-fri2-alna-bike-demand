@@ -11,8 +11,10 @@
     https://mlops-fri2-alna-bike-demand-709271018248.europe-west1.run.app/health
   
 - *Known revisions (as of 2026-11-08):*
-  - mlops-fri2-alna-bike-demand-00004-v4l: 100% traffic (healthy recovered target)
-  - mlops-fri2-alna-bike-demand-00005-h66: 0% traffic (faulty test revision)
+  - mlops-fri2-alna-bike-demand-00006-t77: 100% traffic (recovered, MODEL_PATH /app/artifacts/model.joblib)
+  - mlops-fri2-alna-bike-demand-00005-h66: 0% traffic (do not use: MODEL_PATH /app/artifacts/not-there.joblib, returns 503)
+  - mlops-fri2-alna-bike-demand-00004-v4l: 0% traffic (do not use: MODEL_PATH /app/models/does_not_exist.joblib, returned 503 after the rollback)
+
 
 ## 1. Recognizable Symptoms & Scope
 - *Latency spike:* p95 request duration is clearly above the Cloud Run baseline (see section 6a: about 61 ms on /health). The old 500 ms threshold is only a rough alert level.
@@ -29,14 +31,14 @@
 6. Write down which boundaries you checked and which you did not (service/revision, model, configuration, inputs).
 
 ## 3. Safe Rollback Targets & Procedure
-- - *Target:* Retained Cloud Run revision mlops-fri2-alna-bike-demand-00004-v4l (100% traffic post-recovery).
-- *Model version / checksum of target:* ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6
+- *Target:* Retained Cloud Run revision mlops-fri2-alna-bike-demand-00006-t77 (100% traffic after recovery on 2026-11-08).
+*Model version of target:* ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6. Note: this is the CI smoke fixture (constant prediction), not the accepted model baseline-dd901b9c0fa5, which is not yet deployed. Update this line after the accepted model is deployed.
 - *Do not use:* 00001-hmb unless the team confirms it is compatible. An older revision is not automatically a safe target.
 - *Before switching:* Confirm the target's model version, checksum, feature schema and configuration match the accepted record. If a checksum does not match, do not load or relabel the artifact.
 - *Execution (gcloud):*
   bash
   gcloud run services update-traffic mlops-fri2-alna-bike-demand \
-    --to-revisions=mlops-fri2-alna-bike-demand-00002-j9t=100 \
+    --to-revisions=mlops-fri2-alna-bike-demand-00006-t77=100
     --region=europe-west1
   
 - *Execution (web console):* Cloud Run > mlops-fri2-alna-bike-demand > Revision History > Manage traffic > select 00002-j9t = 100% > Save.
@@ -55,9 +57,10 @@ After the rollback, collect new evidence (not just a successful command):
    uv run python check_deploy.py \
      --base-url https://mlops-fri2-alna-bike-demand-709271018248.europe-west1.run.app \
      --expected-model-version ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6 \
-     --expected-git-sha 279049291ff72587ec47cd9fd84b5d36a2c716fe
-   
-   (The script may need an identity token because the service is not public.)
+     --expected-git-sha <set after redeploy with GIT_SHA>
+
+   (The current revision reports git_sha "unknown" because GIT_SHA was not set at deploy time. Set GIT_SHA on the next deployment so this check can verify it.)
+
 5. Compare baseline, incident and recovery using the same definitions (section 6a).
 
 ## 5. Escalation, Limitations & Last Verified Context
@@ -67,7 +70,7 @@ After the rollback, collect new evidence (not just a successful command):
   - 50 sequential requests over about 18 seconds is a small, short sample.
   - Service health is not the same as prediction quality.
   - This runbook has not yet been tested by another operator.
-- - *Last verified context:* Lab 8 drill, 2026-11-08 by @NouhaSantir.
+  - *Last verified context:* Lab 8 drill, 2026-11-08 by @NouhaSantir.
 
 ## 6. Baseline Reference Windows
 
