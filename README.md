@@ -330,9 +330,10 @@ Part 2: Tests, Defects & Tolerance Questions
 
 ## Pipeline and gate
 
-Lab 7 starts with a **training-only component**. It does not yet implement the
-end-to-end decided-candidate command, evaluator, gate or promotion workflow.
-Shared interfaces and handoffs are documented in
+Lab 7 separates input validation, candidate training, evaluation, gate decisions
+and manual promotion. The quality gate and promotion components have now been
+integrated. A trained or verified bundle is not automatically eligible or
+deployed. Shared interfaces and handoffs are documented in
 [the Lab 7 contract](docs/lab7-contract.md).
 
 ### Clean-checkout commands
@@ -345,35 +346,44 @@ uv run --locked python -m bike_demand.pipeline check --config configs/baseline.y
 ```
 
 The check validates the frozen CSV, twelve ordered predictors and chronological
-partition counts (8,645 train / 4,358 validation / 4,376 held test). It produces
-no model or evaluation score. After committing training code and configuration:
+partition counts: 8645 training rows, 4358 validation rows and 4376 held-test
+rows. It produces no model or evaluation score.
+
+After committing the training code and configuration:
 
 ```powershell
 uv run --locked python -m bike_demand.pipeline train --config configs/baseline.yaml
 ```
 
 This command fits only the 2011 training rows and prints the new candidate
-location under `artifacts/candidates/candidate-<uuid>/`. Each bundle contains the
-model, metadata, exact config and lock, data manifest, actual environment,
-partition identities and a final `bundle.json` with SHA-256 and size per file.
+location under `artifacts/candidates/candidate-<uuid>/`.
+
+Each bundle contains the model, metadata, exact configuration and lock file,
+data manifest, actual environment, partition identities and a final `bundle.json`
+with SHA-256 values and file sizes.
+
 An optional `--candidate-id candidate-<name>` is write-once. Incomplete attempts
-have no completion marker and cannot be reused. Local files can still be edited;
-consumers must verify hashes and the version-store owner must make them durable.
+have no completion marker and cannot be reused. Consumers must verify hashes,
+and the version-store owner must preserve the evaluated bundle.
 
 Training requires committed tracked files and training inputs. Unrelated
 untracked notes are allowed. No accepted pointer, default API model, existing
-MLflow database or legacy metrics file is changed. Exit 0 means **trained**, with
-`evaluation_status: not_evaluated`; it is not eligibility or deployment approval.
+MLflow database or legacy metrics file is changed.
+
+Exit code 0 means **trained**, with `evaluation_status: not_evaluated`.
+It does not mean that the candidate passed the gate or was deployed.
+
 The original `bike_demand.train` remains for baseline compatibility and must not
 be used as the Lab 7 candidate entry point because it overwrites fixed artifacts.
 
 ### Verify a saved candidate before loading
 
-The review identified missing consumer-side checks for a saved bundle. The
-shared reader in `bike_demand.bundles` now verifies the manifest schema, exact
-file names, byte counts, SHA-256 values and metadata cross-references before
-model loading. `load_verified_model` loads the checked bytes from memory.
-The evaluator owner must use this reader in the forthcoming consumer.
+The shared reader in `bike_demand.bundles` verifies the manifest schema,
+exact file names, byte counts, SHA-256 values and metadata cross-references
+before loading the model.
+
+`load_verified_model` loads the checked bytes from memory. Evaluators must use
+this reader before loading a saved candidate.
 
 To audit the local candidate selected in PowerShell:
 
@@ -382,9 +392,12 @@ uv run --locked python -m bike_demand.pipeline verify --candidate-dir $lab7Candi
 ```
 
 Use `--expected-bundle-sha256` to bind verification to a manifest digest recorded
-independently in trusted evidence or immutable storage. Success reports
-`bundle_verified` and `not_evaluated`; it does not establish policy eligibility.
-An invalid selected bundle exits 1 with a reason and remains unchanged.
+independently in trusted evidence or immutable storage.
+
+Success reports `bundle_verified` and `not_evaluated`; it does not establish
+policy eligibility. An invalid selected bundle exits with a nonzero status and
+a reason, while leaving the bundle unchanged.
+
 Pytest checks corrupted synthetic bundles, including the reviewer's changed
 manifest-digest case. It does not automatically inspect ignored local artifacts.
 
@@ -392,66 +405,118 @@ manifest-digest case. It does not automatically inspect ignored local artifacts.
 
 | Question | Choice | Alternative | Reason |
 | --- | --- | --- | --- |
-| Stages | Separate input check, candidate training, evaluation, gate and manual promotion; the first two are implemented here | One training function overwriting the served model | Each stage has a distinct result and write boundary |
-| Entry point | One module with `check` and `train`; lead adds the full decided-candidate stage after Members 2–3 integrate | A sequence of undocumented notebook cells | Explicit CLI inputs support a clean checkout and later composition |
-| Failure | Nonzero exit and reason; no success marker for incomplete training; no automatic numeric retries | Retry a failed policy result until it passes | Failures stay visible and cannot change the accepted model |
-| Partial state | Reserve a unique directory; publish `bundle.json` last; refuse an existing ID | Reuse partly written output as a complete candidate | Consumers can distinguish complete bytes from interrupted work |
-| Identity | Version, model/bundle hashes, data/config/lock, full Git revision, installed environment and observation identities | Filename or seed alone | A decision must refer to the exact evaluated bytes and context |
+| Stages | Separate input check, candidate training, evaluation, gate and manual promotion | One training function overwriting the served model | Each stage has a distinct result and write boundary |
+| Entry point | Documented `check`, `train` and `verify` commands; evaluation, gate and promotion are separate steps | Undocumented notebook cells | Explicit CLI inputs make each result and write boundary visible |
+| Failure | Nonzero exit and reason; no completion marker for incomplete training | Retry a failed policy result until it passes | Failures remain visible and cannot change the accepted model |
+| Partial state | Reserve a unique directory, publish `bundle.json` last and refuse an existing ID | Reuse partly written output | Consumers can distinguish complete bundles from interrupted work |
+| Identity | Version, model and bundle hashes, data, configuration, lock file, Git revision and environment | Filename or seed alone | Decisions must refer to the exact evaluated bytes and context |
 
-The training component bounds RF runs to 1–200 trees, depth 1–20, one worker and
-an explicit seed. These proposed compute bounds need team review. Member 3 must
-commit policy, rationale and candidate budget before real candidate evaluation;
-no quality threshold is inferred from observed results in this PR.
+The training component bounds Random Forest runs to 1–200 trees, depth 1–20,
+one worker and an explicit seed.
 
-Member 2 supplies a trusted frozen incumbent and evaluates all three predictors
-(candidate, incumbent, train-mean baseline) on the same validation rows. Member 3
-produces reasoned `eligible`, `rejected` or `blocked` decisions with mandatory
-quality, operation and integrity checks. Missing reference or invalid evidence
-blocks a decision from becoming eligible. All outcomes leave accepted/served
-state unchanged until Member 4's separately reviewed manual promotion.
+The remaining gate-policy work is to add a train-mean baseline comparison,
+an operational threshold and threshold justifications. Member 3 owns these
+remaining policy changes. The reviewed policy and candidate budget must be
+recorded before deciding eligibility; thresholds must not be adjusted merely
+to obtain a pass.
 
-### Cloud Run transition
+The evaluation contract compares the candidate, a trusted frozen incumbent
+and the train-mean baseline on the same validation rows. The held-test partition
+remains reserved for the final Week 5 evaluation.
 
-The previous CI deployment job generated a **synthetic smoke fixture** and
-deployed automatically on pushes to `main`. Its final step echoed success; it
-did not perform the live identity check previously described here. This Lab 7
-change removes that deployment job and retains `Checks` and `Container`.
-It does not contact or replace the current live service.
+Missing references or invalid evidence must block eligibility. Evaluation and
+gate decisions leave accepted and served state unchanged until a separately
+reviewed manual promotion.
 
-Member 4 must supply manual promotion from reviewed green `main`, deployment of
-the exact eligible bundle, keyless authentication, live `/health` and `/predict`
-identity verification, and retained previous/current accepted bundles and Cloud
-Run revisions for Lab 8. These results remain pending; neither the old success
-message nor tag `m3` proves them. Tag `m4` follows completion of Labs 7–8.
+### Gate policy and decision records
+
+- **Quality gate:** Eligibility checks have been integrated. The baseline comparison, operational threshold and threshold rationale remain to be completed.
+- **Supported outcomes:** `Eligible`, `Rejected` and `Blocked/Error`.
+- **Decision records:** `evidence/decision_record.json` records policy version, identities, measurements and outcome reasons.
+- **Tests:** `tests/test_gate.py` covers eligibility, rejection, missing provenance and non-finite metric blocking.
+
+### Manual promotion
+
+Promotion is a separate action performed from reviewed `main`, after the
+candidate's eligibility and identity have been verified:
+
+```powershell
+uv run python -m bike_demand.promote
+```
+
+The promotion workflow retains the previous accepted bundle in
+`models/previous/` and places the selected candidate in `models/accepted/`.
+
+The review of PR #20 identified a repeated-promotion problem: promoting
+A → B → B could replace the previous bundle A with B. The correction and
+regression test preserve current B and previous A when B is promoted again.
+
+### Rollback without retraining
+
+Recovery must use a retained bundle whose identity, configuration and
+compatibility have been checked. A revision is not a safe rollback target
+merely because it is older.
+
+The retained accepted and previous bundles are stored under
+`models/accepted/` and `models/previous/`. Restoring a local bundle alone does
+not change the running Cloud Run service; deployment or traffic routing and
+fresh live verification are separate steps.
+
+### Cloud Run deployment status
+
+The previous CI deployment used a synthetic smoke fixture. Its success message
+did not establish that the accepted Lab 7 model was deployed.
+
+The automatic deployment job was removed while retaining the `Checks` and
+`Container` workflows.
+
+The Lab 8 recovery checks on revision `00006-t77` returned the model version
+`ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6` and `git_sha: unknown`.
+These results demonstrate service behavior during the observed window, but
+do not establish deployment of the accepted Lab 7 model.
+
+Member 4 must deploy the exact accepted model and record:
+
+- The accepted model version and checksum.
+- The deployed container image and Cloud Run revision.
+- Fresh authenticated `/health` and `/predict` responses matching the expected identity.
+- The retained previous revision and its verified compatibility for rollback.
+
+The intended accepted model version is `baseline-dd901b9c0fa5`.
+Its deployment remains pending in this documentation checkpoint.
+
+The `m4` checkpoint and release should follow completion and review of the
+remaining Labs 7–8 work.
 
 See the [Week 4 team report](reports/week-04-team.md) and
 [Member 1 local evidence](evidence/lab7/member1/README.md).
 
-## Pipeline and Gate
-- **Quality Gate Policy:** Evaluates candidate models against mandatory quality, operational, and integrity criteria.
-- **Outcomes Supported:** `Eligible`, `Rejected`, and `Blocked/Error`.
-- **Decision Records:** Generated decision records are stored in `evidence/decision_record.json` detailing policy version, identities, measurements, and outcome reasons.
-- **Testing:** Unit tests verifying valid eligibility, rejections, missing provenance, and non-finite metric blocking are implemented under `tests/test_gate.py`.
+## Lab 8 — Team contributions
 
-### Promotion
-The candidate model is promoted manually from reviewed `main`:
-    uv run python -m bike_demand.promote
-This moves the current `models/accepted/` bundle to `models/previous/` and copies the candidate artifacts into `models/accepted/`.
+### 1. Nouha SANTIR — Infrastructure, Baseline and Runbook Lead
 
-### Rollback (without retraining)
-To recover the previous accepted model:
-    Copy-Item models/previous/* models/accepted/ -Force
-Then rebuild the Docker image.
+- **Service checks:** Recorded authenticated live endpoint observations.
+- **Baseline:** Documented the pre-incident UTC window, request count, error count and p95 latency for `/health`.
+- **Runbook:** Published [RUNBOOK.md](RUNBOOK.md). Model identity, checksums and revision references must be updated after deployment of the accepted Lab 7 model.
 
-## 1. Nouha SANTIR (Lead — Infrastructure, Baseline & Runbook Lead)
-- **Live Service Verification:** Validated health and prediction endpoint contracts.
-- **Baseline Measurement:** Recorded pre-incident reference traffic, UTC time window, p95 latency, and error metrics on Cloud Run.
-- **Runbook Framework:** Published initial [RUNBOOK.md](RUNBOOK.md) at repo root for operational guidance.
+### 2. Wanying XIONG — Injector, Fault Engineering
 
-## 2. Wanying XIONG (Injector — Fault Engineering)
-- **Fault Design:** Engineered a reversible failure (config/routing) contained within the team's Cloud Run environment.
-- **Controlled Execution:** Maintained secrecy during the drill to simulate real incident detection.
-- **Fault Documentation:** Logged private fault parameters for post-incident validation.
+- **Fault design:** Introduced a reversible configuration failure within the team's Cloud Run environment.
+- **Controlled execution:** Kept the fault parameters private during the diagnosis attempt.
+- **Fault documentation:** Recorded the injected configuration for post-incident comparison with the operator's findings.
+
+### 3. Anas BOUTALEB — Operator, Incident Diagnosis and Mitigation
+
+- **Detection:** Recorded HTTP 503 responses and the initial incident evidence.
+- **Diagnosis:** Compared `MODEL_PATH` across revisions: `00005-h66` used `/app/artifacts/not-there.joblib`, `00004-v4l` used `/app/models/does_not_exist.joblib`, and `00006-t77` used `/app/artifacts/model.joblib`.
+- **Recovery analysis:** Distinguished the failed rollback to `00004-v4l`, which continued returning 503, from the subsequent recovery on `00006-t77`, which returned 200.
+
+### 4. Laroche NGWA NGOH — Recorder, Reviewer and Report Owner
+
+- **Timeline:** Recorded the incident sequence, including the failed rollback to `00004-v4l` and recovery observed on `00006-t77`.
+- **Peer review:** Reviewed PRs #23 and #24 and checked the operational documentation against the available evidence.
+- **Recovery verification:** Checked `/health` and valid `/predict` responses returning 200, confirmed an invalid request returned 422, and ran 50 fresh `/health` requests with 0 errors and a p95 latency of 57.48 ms.
+- **Reporting:** Updated the [Week 4 team report](reports/week-04-team.md) with the timeline, diagnosis, recovery measurements and supporting evidence.
 
 ### 3. Anas BOUTALEB (Operator — Incident Diagnosis & Mitigation)
 *   **Signal Detection**: Recorded the UTC timestamp, scope, and initial anomaly signature (HTTP 503 Service Unavailable).
