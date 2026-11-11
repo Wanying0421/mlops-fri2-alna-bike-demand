@@ -421,8 +421,20 @@ recorded before deciding eligibility; thresholds must not be adjusted merely
 to obtain a pass.
 
 The evaluation contract compares the candidate, a trusted frozen incumbent
-and the train-mean baseline on the same validation rows. The held-test partition
-remains reserved for the final Week 5 evaluation.
+and the train-mean baseline on the same 4,358 validation rows from
+January–June 2012.
+
+Evaluation evidence includes an
+[Eligible normal candidate](evidence/lab7/evaluation/evaluation-normal.json)
+and a [Rejected weak candidate](evidence/lab7/evaluation/evaluation-weak.json).
+The normal candidate matches the incumbent; no accuracy improvement is claimed.
+After rejection, the accepted model hashes remained unchanged
+(`accepted_unchanged: true`).
+
+The final held-test evaluation was run once on the selected model
+`baseline-dd901b9c0fa5`, using the 4376 July–December 2012 rows.
+The selected model achieved MAE 93.74 versus 182.21 for the train-mean baseline.
+See the [held-test results](evidence/final/held-test.json).
 
 Missing references or invalid evidence must block eligibility. Evaluation and
 gate decisions leave accepted and served state unchanged until a separately
@@ -482,8 +494,10 @@ Member 4 must deploy the exact accepted model and record:
 - Fresh authenticated `/health` and `/predict` responses matching the expected identity.
 - The retained previous revision and its verified compatibility for rollback.
 
-The intended accepted model version is `baseline-dd901b9c0fa5`.
-Its deployment remains pending in this documentation checkpoint.
+A `/health` check on 11 November 2026 returned model version
+`ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6`, confirming that the
+live service still served the CI smoke model at the time of the check.
+Deployment of the accepted model `baseline-dd901b9c0fa5` remained pending.
 
 The `m4` checkpoint and release should follow completion and review of the
 remaining Labs 7–8 work.
