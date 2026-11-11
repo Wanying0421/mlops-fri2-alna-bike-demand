@@ -452,3 +452,8 @@ Then rebuild the Docker image.
 - **Fault Design:** Engineered a reversible failure (config/routing) contained within the team's Cloud Run environment.
 - **Controlled Execution:** Maintained secrecy during the drill to simulate real incident detection.
 - **Fault Documentation:** Logged private fault parameters for post-incident validation.
+
+### 3. Anas BOUTALEB (Operator — Incident Diagnosis & Mitigation)
+*   **Signal Detection**: Recorded the UTC timestamp, scope, and initial anomaly signature (HTTP 503 Service Unavailable).
+*   **Hypothesis Testing**: Evaluated competing explanations by comparing the environment variables across Cloud Run revisions. Identified the root cause as a misconfigured `MODEL_PATH` pointing to non-existent files.
+*   **Mitigation & Rollback**: Verified the controlled rollback to the retained compatible Cloud Run revision where the `MODEL_PATH` was correct, and confirmed the service returned to HTTP 200 OK.
