@@ -20,8 +20,20 @@ import joblib
 import numpy as np
 import pandas as pd
 
-FEATURES = ["season", "yr", "mnth", "hr", "holiday", "weekday", "workingday",
-            "weathersit", "temp", "atemp", "hum", "windspeed"]
+FEATURES = [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "temp",
+    "atemp",
+    "hum",
+    "windspeed",
+]
 TARGET = "cnt"
 
 
@@ -42,9 +54,13 @@ def main():
 
     model_sha = sha256(a.model)
     if model_sha != a.expected_sha256:
-        raise SystemExit(f"Model sha256 {model_sha} does not match the selected model; not scoring.")
+        raise SystemExit(
+            f"Model sha256 {model_sha} does not match the selected model; not scoring."
+        )
 
-    df = pd.read_csv(a.data, parse_dates=["dteday"]).sort_values(["dteday", "hr", "instant"])
+    df = pd.read_csv(a.data, parse_dates=["dteday"]).sort_values(
+        ["dteday", "hr", "instant"]
+    )
     train = df[(df.dteday >= "2011-01-01") & (df.dteday <= "2011-12-31")]
     test = df[(df.dteday >= "2012-07-01") & (df.dteday <= "2012-12-31")]
     assert len(train) == 8645, f"train rows {len(train)} != 8645"
@@ -58,21 +74,30 @@ def main():
 
     record = {
         "evaluated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "git_sha": subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip(),
+        "git_sha": subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+        ).stdout.strip(),
         "data_sha256": sha256(a.data),
         "test_window": "2012-07-01..2012-12-31",
         "test_rows": int(len(test)),
-        "selected_model": {"path": str(a.model), "sha256": model_sha,
-                           "mae": float(np.mean(np.abs(pred - y))),
-                           "all_finite": bool(np.isfinite(pred).all())},
-        "train_mean_baseline": {"train_mean": train_mean,
-                                "mae": float(np.mean(np.abs(train_mean - y)))},
+        "selected_model": {
+            "path": str(a.model),
+            "sha256": model_sha,
+            "mae": float(np.mean(np.abs(pred - y))),
+            "all_finite": bool(np.isfinite(pred).all()),
+        },
+        "train_mean_baseline": {
+            "train_mean": train_mean,
+            "mae": float(np.mean(np.abs(train_mean - y))),
+        },
         "note": "Scored once on the already-selected model; not used for model selection or tuning.",
     }
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps(record, indent=2))
-    print(f"held test ({len(test)} rows) | selected model MAE {record['selected_model']['mae']:.2f} "
-          f"| train-mean MAE {record['train_mean_baseline']['mae']:.2f}")
+    print(
+        f"held test ({len(test)} rows) | selected model MAE {record['selected_model']['mae']:.2f} "
+        f"| train-mean MAE {record['train_mean_baseline']['mae']:.2f}"
+    )
     print(f"written: {a.out}")
 
 

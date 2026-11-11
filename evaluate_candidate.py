@@ -22,8 +22,20 @@ import joblib
 import numpy as np
 import pandas as pd
 
-FEATURES = ["season", "yr", "mnth", "hr", "holiday", "weekday", "workingday",
-            "weathersit", "temp", "atemp", "hum", "windspeed"]
+FEATURES = [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "temp",
+    "atemp",
+    "hum",
+    "windspeed",
+]
 TARGET = "cnt"
 
 
@@ -32,7 +44,9 @@ def sha256(path: Path) -> str:
 
 
 def dir_hashes(path: Path) -> dict:
-    files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
+    files = (
+        [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
+    )
     return {str(p): sha256(p) for p in files}
 
 
@@ -100,33 +114,47 @@ def main():
 
     try:
         from bike_demand.gate import evaluate_quality_gate
-        outcome, reasons = evaluate_quality_gate({"mae": cand["mae"]}, {"mae": acc["mae"]})
+
+        outcome, reasons = evaluate_quality_gate(
+            {"mae": cand["mae"]}, {"mae": acc["mae"]}
+        )
     except Exception as e:  # gate unavailable -> never count as pass
         outcome, reasons = "Blocked/Error", [f"Gate could not run: {e}"]
 
     accepted_after = dir_hashes(a.accepted)
-    git_sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    git_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
 
     record = {
         "evaluated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git_sha": git_sha,
-        "data": {"path": str(a.data), "sha256": sha256(a.data),
-                 "validation_window": "2012-01-01..2012-06-30", "validation_rows": len(val)},
+        "data": {
+            "path": str(a.data),
+            "sha256": sha256(a.data),
+            "validation_window": "2012-01-01..2012-06-30",
+            "validation_rows": len(val),
+        },
         "candidate": {"path": str(cand_file), "sha256": sha256(cand_file), **cand},
         "accepted": {"path": str(acc_file), "sha256": sha256(acc_file), **acc},
         "train_mean_baseline": {"train_mean": train_mean, "mae": naive_mae},
         "candidate_beats_train_mean": cand["mae"] < naive_mae,
-        "gate": {"policy_file": "src/bike_demand/gate.py",
-                 "policy_sha256": sha256(Path("src/bike_demand/gate.py")),
-                 "outcome": outcome, "reasons": reasons},
+        "gate": {
+            "policy_file": "src/bike_demand/gate.py",
+            "policy_sha256": sha256(Path("src/bike_demand/gate.py")),
+            "outcome": outcome,
+            "reasons": reasons,
+        },
         "accepted_unchanged": accepted_before == accepted_after,
         "accepted_hashes": accepted_after,
     }
     a.out.mkdir(parents=True, exist_ok=True)
     out = a.out / f"evaluation-{a.label}.json"
     out.write_text(json.dumps(record, indent=2))
-    print(f"candidate MAE {cand['mae']:.2f} | accepted MAE {acc['mae']:.2f} | "
-          f"train-mean MAE {naive_mae:.2f}")
+    print(
+        f"candidate MAE {cand['mae']:.2f} | accepted MAE {acc['mae']:.2f} | "
+        f"train-mean MAE {naive_mae:.2f}"
+    )
     print(f"gate: {outcome} | accepted unchanged: {record['accepted_unchanged']}")
     print(f"written: {out}")
 
