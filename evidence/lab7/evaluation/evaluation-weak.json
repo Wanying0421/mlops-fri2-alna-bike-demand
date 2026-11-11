@@ -1,0 +1,45 @@
+{
+  "evaluated_at_utc": "2026-11-11T20:40:02+00:00",
+  "git_sha": "05a2e871f0278b6279d181b37ae4ee5a213a0557",
+  "data": {
+    "path": "data\\raw\\hour.csv",
+    "sha256": "e03de4ee4ef4dc376ac6e04bf829673c6269e8eba5c60fa121640fa2f829504f",
+    "validation_window": "2012-01-01..2012-06-30",
+    "validation_rows": 4358
+  },
+  "candidate": {
+    "path": "artifacts\\candidates\\candidate-c78a59ea61cc41408d54b049ab5caa10\\model.joblib",
+    "sha256": "fb57a43d3493d489c793e5a47711308d9668a1550a6bb23f9106c25e8d77ec1a",
+    "mae": 116.52080901673065,
+    "n_rows": 4358,
+    "all_finite": true,
+    "batch_predict_seconds": 0.0262,
+    "single_row_p95_ms": 0.592
+  },
+  "accepted": {
+    "path": "artifacts\\model.joblib",
+    "sha256": "fd98ceafc57a5babce61ce703cbf9cb8d1f83c6820b0b34fe30ad1a0fc49c304",
+    "mae": 86.84685685591091,
+    "n_rows": 4358,
+    "all_finite": true,
+    "batch_predict_seconds": 0.0095,
+    "single_row_p95_ms": 2.026
+  },
+  "train_mean_baseline": {
+    "train_mean": 143.79444765760556,
+    "mae": 154.23179306864967
+  },
+  "candidate_beats_train_mean": true,
+  "gate": {
+    "policy_file": "src/bike_demand/gate.py",
+    "policy_sha256": "05eb0fd03d12749735a378c9eda809e60da3c749f5a3bcdd78f1f2ac77d80c0b",
+    "outcome": "Rejected",
+    "reasons": [
+      "Candidate MAE (116.52080901673065) exceeds incumbent threshold (86.84685685591091)."
+    ]
+  },
+  "accepted_unchanged": true,
+  "accepted_hashes": {
+    "artifacts\\model.joblib": "fd98ceafc57a5babce61ce703cbf9cb8d1f83c6820b0b34fe30ad1a0fc49c304"
+  }
+}
