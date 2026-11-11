@@ -55,11 +55,74 @@ The following captures show the local Docker demonstration shared in PR #20:
 
 ![Previous model version served after rollback in local Docker](images/lab-07-rollback-local.png)
 
-### Evidence still to document
+### Evaluation and quality-gate evidence
 
-- The command that runs training, evaluation and the gate together, with a link to the gate policy and a decision based on the validation results.
-- A rejection example showing that the accepted model stayed unchanged.
-- The model version and revision verified on Cloud Run, with the previous revision identified for rollback.
+The evaluation results were provided by Wanying and merged into `main` in
+[PR #25](https://github.com/Wanying0421/mlops-fri2-alna-bike-demand/pull/25).
+
+These results complement Member 1's earlier local bundle check, which reported
+`not_evaluated`.
+
+The frozen accepted reference is `baseline-dd901b9c0fa5`, a Random Forest
+with 50 trees and maximum depth 10.
+
+Model artifact SHA-256:
+
+```text
+fd98ceafc57a5babce61ce703cbf9cb8d1f83c6820b0b34fe30ad1a0fc49c304
+```
+
+All validation results use the same 4358 rows from January–June 2012.
+
+| Model | Validation MAE | Reported outcome |
+| --- | ---: | --- |
+| Train-mean baseline | 154.23 | Comparison reference |
+| Accepted Random Forest: 50 trees, depth 10 | 86.85 | Frozen incumbent |
+| Normal candidate: 50 trees, depth 10 | 86.85 | Eligible |
+| Weak candidate: 1 tree, depth 1 | 116.52 | Rejected |
+
+The normal candidate matches the incumbent; no accuracy improvement is claimed.
+
+The weak candidate performs better than the train-mean baseline but worse
+than the accepted model, and was rejected. The evidence records
+`accepted_unchanged: true`, confirming that the accepted model hashes
+remained unchanged after rejection.
+
+Evidence:
+
+- [Normal-candidate evaluation](../evidence/lab7/evaluation/evaluation-normal.json)
+- [Weak-candidate evaluation and rejection](../evidence/lab7/evaluation/evaluation-weak.json)
+
+### Final held-test evaluation — Week 5
+
+Wanying reports that the selected model and the train-mean baseline were
+evaluated once on the 4376 held-test rows from July–December 2012.
+
+| Model | Held-test MAE |
+| --- | ---: |
+| Train-mean baseline | 182.21 |
+| Selected Random Forest | 93.74 |
+
+These held-test results are separate from the validation measurements
+used for the Lab 7 gate.
+
+Evidence: [Final held-test results](../evidence/final/held-test.json).
+
+### Remaining integration and deployment evidence
+
+- Document the exact command or sequence connecting training, evaluation
+  and the gate, with a link to the versioned gate policy.
+- Complete the remaining gate-policy documentation, including its
+  operational threshold and threshold justifications. Reporting a baseline
+  score does not by itself establish that the gate implements a baseline rule.
+- As reported by Wanying on 11 November 2026, Cloud Run still serves
+  `ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6`, rather than
+  `baseline-dd901b9c0fa5`. Deployment of the accepted model remains pending.
+- After deployment, record the new revision and container identity,
+  verify authenticated `/health` and `/predict` responses against the
+  expected model version, and retain the previous revision for rollback.
+  The previously observed operational revision, `00006-t77`, serves the
+  smoke model and must not be described as the accepted Lab 7 model.
 
 
 
