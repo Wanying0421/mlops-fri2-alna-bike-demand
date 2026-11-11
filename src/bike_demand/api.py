@@ -55,6 +55,8 @@ async def lifespan(app: FastAPI):
     if explicit_model_path is not None or explicit_metadata_path is not None:
         model_path = Path(explicit_model_path) if explicit_model_path else None
         metadata_path = Path(explicit_metadata_path) if explicit_metadata_path else None
+        if model_path and not metadata_path:
+            metadata_path = model_path.parent / "model-metadata.json"
     else:
         # 2. Otherwise, use versions.json if it exists
         models_dir = Path(os.getenv("MODELS_DIR", "models"))
