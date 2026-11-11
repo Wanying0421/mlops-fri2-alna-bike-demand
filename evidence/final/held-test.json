@@ -1,0 +1,18 @@
+{
+  "evaluated_at_utc": "2026-11-11T21:03:38+00:00",
+  "git_sha": "5114a22b76fecc13ffdcbca48a8694ac8d006d97",
+  "data_sha256": "e03de4ee4ef4dc376ac6e04bf829673c6269e8eba5c60fa121640fa2f829504f",
+  "test_window": "2012-07-01..2012-12-31",
+  "test_rows": 4376,
+  "selected_model": {
+    "path": "artifacts\\model.joblib",
+    "sha256": "fd98ceafc57a5babce61ce703cbf9cb8d1f83c6820b0b34fe30ad1a0fc49c304",
+    "mae": 93.73505906420367,
+    "all_finite": true
+  },
+  "train_mean_baseline": {
+    "train_mean": 143.79444765760556,
+    "mae": 182.21439084104577
+  },
+  "note": "Scored once on the already-selected model; not used for model selection or tuning."
+}
