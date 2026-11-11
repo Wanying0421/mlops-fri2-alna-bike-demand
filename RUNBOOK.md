@@ -10,9 +10,9 @@
   curl -i -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
     https://mlops-fri2-alna-bike-demand-709271018248.europe-west1.run.app/health
   
-- *Known revisions (as of 2026-11-07):*
-  - mlops-fri2-alna-bike-demand-00002-j9t: 100% traffic (latest)
-  - mlops-fri2-alna-bike-demand-00001-hmb: 0% traffic (older)
+- *Known revisions (as of 2026-11-08):*
+  - mlops-fri2-alna-bike-demand-00004-v4l: 100% traffic (healthy recovered target)
+  - mlops-fri2-alna-bike-demand-00005-h66: 0% traffic (faulty test revision)
 
 ## 1. Recognizable Symptoms & Scope
 - *Latency spike:* p95 request duration is clearly above the Cloud Run baseline (see section 6a: about 61 ms on /health). The old 500 ms threshold is only a rough alert level.
@@ -29,8 +29,8 @@
 6. Write down which boundaries you checked and which you did not (service/revision, model, configuration, inputs).
 
 ## 3. Safe Rollback Targets & Procedure
-- *Target:* Retained Cloud Run revision mlops-fri2-alna-bike-demand-00002-j9t (100% traffic before the drill).
-- *Model version / checksum of target:* TO BE CONFIRMED (previous value v1.2.0 was a placeholder and is not verified).
+- - *Target:* Retained Cloud Run revision mlops-fri2-alna-bike-demand-00004-v4l (100% traffic post-recovery).
+- *Model version / checksum of target:* ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6
 - *Do not use:* 00001-hmb unless the team confirms it is compatible. An older revision is not automatically a safe target.
 - *Before switching:* Confirm the target's model version, checksum, feature schema and configuration match the accepted record. If a checksum does not match, do not load or relabel the artifact.
 - *Execution (gcloud):*
@@ -54,8 +54,8 @@ After the rollback, collect new evidence (not just a successful command):
    bash
    uv run python check_deploy.py \
      --base-url https://mlops-fri2-alna-bike-demand-709271018248.europe-west1.run.app \
-     --expected-model-version <TO BE CONFIRMED> \
-     --expected-git-sha <TO BE CONFIRMED>
+     --expected-model-version ci-smoke-7d7e10fd3a3f36533c077732d21d07177fad32d6 \
+     --expected-git-sha 279049291ff72587ec47cd9fd84b5d36a2c716fe
    
    (The script may need an identity token because the service is not public.)
 5. Compare baseline, incident and recovery using the same definitions (section 6a).
@@ -67,7 +67,7 @@ After the rollback, collect new evidence (not just a successful command):
   - 50 sequential requests over about 18 seconds is a small, short sample.
   - Service health is not the same as prediction quality.
   - This runbook has not yet been tested by another operator.
-- *Last verified context:* Lab 8 drill, 2026-11-07. To be updated after the peer attempt.
+- - *Last verified context:* Lab 8 drill, 2026-11-08 by @NouhaSantir.
 
 ## 6. Baseline Reference Windows
 
